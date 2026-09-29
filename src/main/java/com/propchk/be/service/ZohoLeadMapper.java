@@ -145,12 +145,18 @@ public class ZohoLeadMapper {
 
     public String computePaymentStatus(String refundFlag, String fullPaymentReceivedFlag,
                                        Double refund, Double received, Double pending) {
-        if ("Yes".equalsIgnoreCase(refundFlag) || (refund != null && refund > 0)) {
+        
+        if (refundFlag != null && (refundFlag.trim().equalsIgnoreCase("Yes") || refundFlag.trim().equalsIgnoreCase("true"))) {
             return "Refunded";
         }
-        if ("Yes".equalsIgnoreCase(fullPaymentReceivedFlag)) {
+        if (refund != null && refund > 0) {
+            return "Refunded";
+        }
+        
+        if (fullPaymentReceivedFlag != null && (fullPaymentReceivedFlag.trim().equalsIgnoreCase("Yes") || fullPaymentReceivedFlag.trim().equalsIgnoreCase("true"))) {
             return "Fully Paid";
         }
+        
         if (pending != null && pending <= 100) return "Fully Paid";
         if (received != null && received > 0) return "Partially Paid";
         return "Unpaid";
