@@ -70,6 +70,15 @@ public class LeadController {
                 }
             }
 
+            // Also fetch inactive ones so we can correctly label them as Postponed/Cancelled instead of Unbooked
+            java.util.List<com.propchk.be.entity.Booking> inactiveBookings = bookingRepository.findCancelledOrPostponedBookingsByLeadIds(leadIds);
+            java.util.Map<Long, com.propchk.be.entity.Booking> inactiveMap = new java.util.HashMap<>();
+            for (com.propchk.be.entity.Booking b : inactiveBookings) {
+                if (!inactiveMap.containsKey(b.getLeadId())) {
+                    inactiveMap.put(b.getLeadId(), b);
+                }
+            }
+
             for (Lead l : leads) {
                 com.propchk.be.entity.Booking b = bookingMap.get(l.getId());
                 if (b != null) {
@@ -81,7 +90,11 @@ public class LeadController {
                         l.setInspectionDateAndTime(b.getDate() + " " + b.getSlotTime());
                     }
                 } else {
-                    l.setCurrentBookingStatus("UNBOOKED");
+                    if (inactiveMap.containsKey(l.getId())) {
+                        l.setCurrentBookingStatus("POSTPONED_CANCELLED");
+                    } else {
+                        l.setCurrentBookingStatus("UNBOOKED");
+                    }
                 }
             }
         }

@@ -46,6 +46,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT b FROM Booking b WHERE b.leadId IN :leadIds AND b.status NOT IN ('CANCELLED', 'POSTPONED')")
     List<Booking> findActiveBookingsByLeadIds(@Param("leadIds") List<Long> leadIds);
 
+    /** Fetch cancelled/postponed bookings for a list of leads */
+    @Query("SELECT b FROM Booking b WHERE b.leadId IN :leadIds AND b.status IN ('CANCELLED', 'POSTPONED') ORDER BY b.updatedAt DESC")
+    List<Booking> findCancelledOrPostponedBookingsByLeadIds(@Param("leadIds") List<Long> leadIds);
+
     /** All future CONFIRMED bookings for a specific engineer */
     @Query("SELECT b FROM Booking b WHERE b.engineerEmployeeNumber = :empNum " +
            "AND b.status = 'CONFIRMED' AND b.date >= :fromDate")

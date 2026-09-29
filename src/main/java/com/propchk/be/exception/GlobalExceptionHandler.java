@@ -24,4 +24,15 @@ public class GlobalExceptionHandler {
         response.put("error", "Email already exists");
         return new ResponseEntity<>(response, HttpStatus.CONFLICT);
     }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
+        Map<String, String> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        
+        if (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("not found")) {
+            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
 }

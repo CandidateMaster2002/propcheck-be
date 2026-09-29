@@ -70,6 +70,40 @@ public class UserService {
         return users.stream().map(this::mapToSummary).collect(Collectors.toList());
     }
 
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new RuntimeException("User not found");
+        }
+        userRepository.deleteById(id);
+    }
+
+    public void updateUser(Long id, com.propchk.be.dto.UpdateUserRequest req) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (req.getName() != null && !req.getName().trim().isEmpty()) {
+            user.setName(req.getName());
+        }
+        if (req.getEmail() != null && !req.getEmail().trim().isEmpty()) {
+            // Check for duplicate email on another user
+            userRepository.findByEmail(req.getEmail()).ifPresent(existing -> {
+                if (!existing.getId().equals(user.getId())) {
+                    throw new DuplicateEmailException("Email already exists");
+                }
+            });
+            user.setEmail(req.getEmail());
+        }
+        if (req.getCity() != null) {
+            user.setCity(req.getCity());
+        }
+        if (req.getPassword() != null && !req.getPassword().trim().isEmpty()) {
+            String hashed = org.mindrot.jbcrypt.BCrypt.hashpw(req.getPassword(), org.mindrot.jbcrypt.BCrypt.gensalt());
+            user.setPassword(hashed);
+        }
+
+        userRepository.save(user);
+    }
+
     private UserSummary mapToSummary(User user) {
         return new UserSummary(
                 user.getId(),

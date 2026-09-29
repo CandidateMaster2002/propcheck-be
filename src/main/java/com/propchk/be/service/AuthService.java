@@ -19,7 +19,14 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
-        if (!user.getPassword().equals(password)) {
+        boolean passwordMatches = false;
+        if (user.getPassword().startsWith("$2a$")) {
+            passwordMatches = org.mindrot.jbcrypt.BCrypt.checkpw(password, user.getPassword());
+        } else {
+            passwordMatches = user.getPassword().equals(password);
+        }
+
+        if (!passwordMatches) {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
@@ -35,11 +42,19 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
-        if (!user.getPassword().equals(oldPassword)) {
+        boolean passwordMatches = false;
+        if (user.getPassword().startsWith("$2a$")) {
+            passwordMatches = org.mindrot.jbcrypt.BCrypt.checkpw(oldPassword, user.getPassword());
+        } else {
+            passwordMatches = user.getPassword().equals(oldPassword);
+        }
+
+        if (!passwordMatches) {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
-        user.setPassword(newPassword);
+        String hashedNew = org.mindrot.jbcrypt.BCrypt.hashpw(newPassword, org.mindrot.jbcrypt.BCrypt.gensalt());
+        user.setPassword(hashedNew);
         userRepository.save(user);
     }
 }

@@ -38,4 +38,18 @@ public class UserController {
         List<UserSummary> users = userService.listUsers(role);
         return ResponseEntity.ok(users);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<java.util.Map<String, String>> deleteUser(@PathVariable Long id) {
+        // TODO: Ensure this is called by an ADMIN role (Frontend handles routing, but backend should ideally verify token)
+        userService.deleteUser(id);
+        return ResponseEntity.ok(java.util.Map.of("message", "User deleted successfully"));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<java.util.Map<String, String>> updateUser(@PathVariable Long id, @RequestBody com.propchk.be.dto.UpdateUserRequest request) {
+        // TODO: Ensure this is called by an ADMIN role
+        userService.updateUser(id, request);
+        return ResponseEntity.ok(java.util.Map.of("message", "User updated successfully"));
+    }
 }
