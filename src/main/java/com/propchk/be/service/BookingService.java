@@ -182,6 +182,32 @@ public class BookingService {
         User creator = userRepository.findById(req.getCreatedByUserId())
                 .orElseThrow(() -> new RuntimeException("User not found: " + req.getCreatedByUserId()));
 
+        String role = creator.getRole().name();
+        String paymentStatus = lead.getPaymentStatus();
+
+        // PAYMENT STATUS GUARDS (applies to ALL roles)
+        // 1. Refunded leads cannot be booked by anyone
+        if ("Refunded".equals(paymentStatus)) {
+            throw new RuntimeException(
+                "Booking not allowed: this lead has been refunded. Please contact the sales team.");
+        }
+
+        // 2. Unpaid leads can only be booked by Sales/City Head/Admin — not by customer
+        if ("CUSTOMER".equals(role) && "Unpaid".equals(paymentStatus)) {
+            throw new RuntimeException(
+                "Booking not allowed: your payment is pending. Please complete the payment to proceed.");
+        }
+
+        // DUPLICATE ACTIVE BOOKING GUARD (applies to ALL roles)
+        if ("INSPECTION".equals(req.getBookingType())) {
+            boolean alreadyHasActive = bookingRepository.existsActiveBookingForLeadAndType(lead.getId(), "INSPECTION");
+            if (alreadyHasActive) {
+                throw new RuntimeException(
+                    "This lead already has an active inspection booking. " +
+                    "Please cancel or reschedule the existing booking first.");
+            }
+        }
+
         // Validate slot time
         validateSlotTime(req.getSlot(), req.getSlotTime());
 
@@ -206,27 +232,25 @@ public class BookingService {
         }
 
         // Determine initial status
-        String role = creator.getRole().name();
         String status;
 
         if (!"CUSTOMER".equals(role)) {
-            // Sales, City Head, Admin → straight to pending assignment (they have already reviewed logistics)
+            // Sales/City Head/Admin — always goes to pending assignment regardless of payment
+            // (Refunded was already blocked above)
             status = "PENDING_ENGINEER_ASSIGNMENT";
         } else {
             // Customer self-serve bookings
             if (!isStandardCity) {
-                // Non-standard city (Chennai, Others, etc.): always needs sales approval for travel review.
+                // Non-standard city: always needs sales approval
                 status = "PENDING_APPROVAL";
                 logger.info("Booking for non-standard city '{}' by customer — routing to PENDING_APPROVAL.", req.getCity());
             } else {
-                // Standard city customer: payment determines auto-approval
-                String paymentStatus = lead.getPaymentStatus();
+                // Standard city customer: payment determines routing
                 if ("Fully Paid".equals(paymentStatus)) {
-                    status = "PENDING_ENGINEER_ASSIGNMENT";
-                } else if ("Partially Paid".equals(paymentStatus)) {
-                    status = "PENDING_APPROVAL";
+                    status = "PENDING_ENGINEER_ASSIGNMENT"; // Auto-approved
                 } else {
-                    throw new RuntimeException("Booking not allowed: payment status is " + paymentStatus);
+                    // Partially Paid → needs approval (Unpaid already blocked above)
+                    status = "PENDING_APPROVAL";
                 }
             }
         }
