@@ -398,19 +398,30 @@ public class TeamsActionController {
         }
 
         // Not found fallback
-        return ResponseEntity.ok(Map.of(
+        Map<String, Object> fallback = Map.of(
                 "type", "message",
                 "text", "❌ No lead found matching: '" + query + "'. Type `help` to see available commands."
-        ));
+        );
+        try {
+            teamsNotificationService.postToTeams(fallback);
+        } catch (Exception ignored) {}
+        return ResponseEntity.ok(fallback);
     }
 
     private Map<String, Object> wrapCard(Map<String, Object> card) {
-        return Map.of(
+        Map<String, Object> msg = Map.of(
                 "type", "message",
                 "attachments", List.of(Map.of(
                         "contentType", "application/vnd.microsoft.card.adaptive",
                         "content", card
                 ))
         );
+        // Post directly to channel webhook as guaranteed delivery mechanism
+        try {
+            teamsNotificationService.postToTeams(msg);
+        } catch (Exception e) {
+            logger.warn("Could not post bot card to Teams channel webhook: {}", e.getMessage());
+        }
+        return msg;
     }
 }
