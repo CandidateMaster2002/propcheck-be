@@ -38,4 +38,25 @@ public class ScheduleController {
         List<EngineerSchedule> matrix = scheduleService.getEngineerMatrix(startDate, endDate, city, employeeNumber);
         return ResponseEntity.ok(matrix);
     }
+
+    /**
+     * Trigger the daily morning briefing Adaptive Card to Microsoft Teams.
+     * POST /api/schedule/send-briefing?date=2026-10-11
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/send-briefing")
+    public ResponseEntity<java.util.Map<String, Object>> sendBriefing(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        scheduleService.sendMorningBriefing(date != null ? date : LocalDate.now());
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "message", "Daily briefing sent to Teams!"));
+    }
+
+    /**
+     * Feature 6: Trigger the weekly management digest Adaptive Card to Microsoft Teams.
+     * POST /api/schedule/send-weekly-digest
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/send-weekly-digest")
+    public ResponseEntity<java.util.Map<String, Object>> sendWeeklyDigest() {
+        scheduleService.sendWeeklyManagementDigest();
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "message", "Weekly management digest sent to Teams!"));
+    }
 }

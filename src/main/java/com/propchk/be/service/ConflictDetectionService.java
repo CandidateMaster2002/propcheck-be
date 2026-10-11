@@ -19,11 +19,20 @@ public class ConflictDetectionService {
 
     private final BookingRepository bookingRepository;
     private final EngineerLeaveRepository leaveRepository;
+    private final com.propchk.be.repository.LeadRepository leadRepository;
+    private final com.propchk.be.repository.EngineerRepository engineerRepository;
+    private final TeamsNotificationService teamsNotificationService;
 
     public ConflictDetectionService(BookingRepository bookingRepository,
-                                    EngineerLeaveRepository leaveRepository) {
+                                    EngineerLeaveRepository leaveRepository,
+                                    com.propchk.be.repository.LeadRepository leadRepository,
+                                    com.propchk.be.repository.EngineerRepository engineerRepository,
+                                    TeamsNotificationService teamsNotificationService) {
         this.bookingRepository = bookingRepository;
         this.leaveRepository = leaveRepository;
+        this.leadRepository = leadRepository;
+        this.engineerRepository = engineerRepository;
+        this.teamsNotificationService = teamsNotificationService;
     }
 
     /**
@@ -64,6 +73,19 @@ public class ConflictDetectionService {
                 logger.warn("CONFLICT detected — Booking ID {} | Lead {} | Date {} | Engineer {} | Reason: {}",
                         booking.getId(), booking.getLeadId(), booking.getDate(),
                         booking.getEngineerEmployeeNumber(), reason);
+
+                // Push urgent real-time alert card to Microsoft Teams
+                try {
+                    com.propchk.be.entity.Lead lead = leadRepository.findById(booking.getLeadId()).orElse(null);
+                    String engineerName = engineerRepository.findByEmployeeNumber(booking.getEngineerEmployeeNumber())
+                            .map(com.propchk.be.entity.Engineer::getName)
+                            .orElse(booking.getEngineerEmployeeNumber());
+                    String leaveType = leaves.get(0).getLeaveTypeName();
+
+                    teamsNotificationService.sendConflictAlertNotification(booking, lead, engineerName, leaveType, reason);
+                } catch (Exception e) {
+                    logger.error("Failed to push Teams conflict alert for booking {}: {}", booking.getId(), e.getMessage());
+                }
 
                 conflictCount++;
             }

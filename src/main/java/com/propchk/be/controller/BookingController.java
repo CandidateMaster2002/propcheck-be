@@ -4,6 +4,7 @@ import com.propchk.be.dto.AssignEngineerRequest;
 import com.propchk.be.dto.CreateBookingRequest;
 import com.propchk.be.entity.Booking;
 import com.propchk.be.entity.Engineer;
+import com.propchk.be.entity.Lead;
 import com.propchk.be.repository.BookingRepository;
 import com.propchk.be.repository.EngineerRepository;
 import com.propchk.be.service.BookingService;
@@ -21,13 +22,19 @@ public class BookingController {
     private final BookingService bookingService;
     private final BookingRepository bookingRepository;
     private final EngineerRepository engineerRepository;
+    private final com.propchk.be.service.TeamsNotificationService teamsNotificationService;
+    private final com.propchk.be.repository.LeadRepository leadRepository;
 
     public BookingController(BookingService bookingService,
                              BookingRepository bookingRepository,
-                             EngineerRepository engineerRepository) {
+                             EngineerRepository engineerRepository,
+                             com.propchk.be.service.TeamsNotificationService teamsNotificationService,
+                             com.propchk.be.repository.LeadRepository leadRepository) {
         this.bookingService = bookingService;
         this.bookingRepository = bookingRepository;
         this.engineerRepository = engineerRepository;
+        this.teamsNotificationService = teamsNotificationService;
+        this.leadRepository = leadRepository;
     }
 
     /**
@@ -271,5 +278,54 @@ public class BookingController {
         }
         Booking booking = activeBookings.get(0);
         return getAvailableEngineers(booking.getCity(), booking.getDate().toString(), booking.getSlot());
+    }
+
+    /**
+     * Demo endpoint: Triggers an urgent conflict alert card to Microsoft Teams for a booking.
+     * POST /api/bookings/test-conflict-teams?bookingId=1
+     */
+    @PostMapping("/test-conflict-teams")
+    public ResponseEntity<Map<String, Object>> testConflictAlert(@RequestParam(required = false) Long bookingId) {
+        Booking booking;
+        if (bookingId != null) {
+            booking = bookingRepository.findById(bookingId).orElse(null);
+        } else {
+            booking = bookingRepository.findAll().stream().findFirst().orElse(null);
+        }
+
+        if (booking == null) {
+            // Create a mock booking for demo if database has none
+            booking = new Booking();
+            booking.setLeadId(6315L);
+            booking.setCity("Bangalore");
+            booking.setDate(LocalDate.now().plusDays(1));
+            booking.setSlot("MORNING");
+            booking.setSlotTime("10:30");
+            booking.setEngineerEmployeeNumber("EMP-104");
+        }
+
+        final Booking targetBooking = booking;
+        final Long leadId = targetBooking.getLeadId();
+
+        Lead lead = leadRepository.findById(leadId).orElseGet(() -> {
+            Lead dummy = new Lead();
+            dummy.setId(leadId);
+            dummy.setCustomerName("Hari Krishna");
+            dummy.setProjectName("Prestige Falcon City");
+            dummy.setCity("Bangalore");
+            return dummy;
+        });
+
+        String engName = "Rahul Sharma";
+        String leaveType = "Sick / Medical Leave";
+        String reason = "Engineer EMP-104 has emergency approved leave on " + booking.getDate() + " (" + leaveType + ")";
+
+        teamsNotificationService.sendConflictAlertNotification(booking, lead, engName, leaveType, reason);
+        return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "message", "Conflict alert sent to Microsoft Teams!",
+                "customer", lead.getCustomerName(),
+                "engineer", engName
+        ));
     }
 }

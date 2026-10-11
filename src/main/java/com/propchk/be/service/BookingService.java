@@ -52,17 +52,20 @@ public class BookingService {
     private final EngineerLeaveRepository leaveRepository;
     private final LeadRepository leadRepository;
     private final UserRepository userRepository;
+    private final TeamsNotificationService teamsNotificationService;
 
     public BookingService(BookingRepository bookingRepository,
                           EngineerRepository engineerRepository,
                           EngineerLeaveRepository leaveRepository,
                           LeadRepository leadRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          TeamsNotificationService teamsNotificationService) {
         this.bookingRepository = bookingRepository;
         this.engineerRepository = engineerRepository;
         this.leaveRepository = leaveRepository;
         this.leadRepository = leadRepository;
         this.userRepository = userRepository;
+        this.teamsNotificationService = teamsNotificationService;
     }
 
     /**
@@ -351,7 +354,16 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         booking.setStatus("CANCELLED");
         booking.setUpdatedAt(Instant.now());
-        return bookingRepository.save(booking);
+        Booking saved = bookingRepository.save(booking);
+
+        leadRepository.findById(saved.getLeadId()).ifPresent(lead -> {
+            try {
+                teamsNotificationService.sendCancellationAlertNotification(saved, lead, "Operations / Portal");
+            } catch (Exception e) {
+                logger.error("Failed to send Teams cancellation notification: {}", e.getMessage());
+            }
+        });
+        return saved;
     }
 
     /**
@@ -434,6 +446,7 @@ public class BookingService {
             throw new RuntimeException("Cannot reschedule a cancelled booking.");
         }
 
+        LocalDate oldDate = booking.getDate();
         LocalDate newDate = LocalDate.parse(req.getDate());
         if (newDate.isBefore(LocalDate.now())) {
             throw new RuntimeException("Cannot reschedule to a date in the past.");
@@ -500,6 +513,12 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Lead not found: " + booking.getLeadId()));
         leadToUpdate.setInspectionDateAndTime(req.getDate() + " " + req.getSlotTime());
         leadRepository.save(leadToUpdate);
+
+        try {
+            teamsNotificationService.sendRescheduleAlertNotification(saved, leadToUpdate, oldDate, newDate, role);
+        } catch (Exception e) {
+            logger.error("Failed to send Teams reschedule alert: {}", e.getMessage());
+        }
 
         logger.info("Booking {} rescheduled to {} {} {} by User {} | Previous engineer: {} cleared | New status: {}",
                 bookingId, newDate, req.getSlot(), req.getSlotTime(),

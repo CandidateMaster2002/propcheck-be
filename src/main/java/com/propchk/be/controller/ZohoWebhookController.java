@@ -34,13 +34,19 @@ public class ZohoWebhookController {
     private final ZohoTokenService zohoTokenService;
     private final ZohoLeadMapper leadMapper;
     private final RestTemplate restTemplate;
+    private final com.propchk.be.service.TeamsNotificationService teamsNotificationService;
+    private final com.propchk.be.repository.LeadRepository leadRepository;
 
     public ZohoWebhookController(ZohoTokenService zohoTokenService,
                                   ZohoLeadMapper leadMapper,
-                                  RestTemplate restTemplate) {
+                                  RestTemplate restTemplate,
+                                  com.propchk.be.service.TeamsNotificationService teamsNotificationService,
+                                  com.propchk.be.repository.LeadRepository leadRepository) {
         this.zohoTokenService = zohoTokenService;
         this.leadMapper = leadMapper;
         this.restTemplate = restTemplate;
+        this.teamsNotificationService = teamsNotificationService;
+        this.leadRepository = leadRepository;
     }
 
     /**
@@ -121,12 +127,40 @@ public class ZohoWebhookController {
         logger.info("Upserted Lead Won record: localId={} zohoId={} customer={}",
                 saved.getId(), zohoId, saved.getCustomerName());
 
-        // 6. Done
+        // 6. Push real-time interactive Adaptive Card alert to Microsoft Teams
+        try {
+            teamsNotificationService.sendLeadWonNotification(saved);
+        } catch (Exception e) {
+            logger.error("Error triggering Teams notification for lead {}: {}", saved.getId(), e.getMessage());
+        }
+
+        // 7. Done
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", "ok");
         response.put("zohoId", zohoId);
         response.put("localLeadId", saved.getId());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Test endpoint for client demo: trigger an instant Teams Adaptive Card for an existing lead.
+     * POST /api/webhooks/zoho/test-teams?id=1
+     */
+    @PostMapping("/test-teams")
+    public ResponseEntity<Map<String, Object>> testTeamsAlert(@RequestParam(required = false) Long id) {
+        Lead lead;
+        if (id != null) {
+            lead = leadRepository.findById(id).orElse(null);
+        } else {
+            lead = leadRepository.findAll().stream().findFirst().orElse(null);
+        }
+
+        if (lead == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No lead found in database to test with."));
+        }
+
+        teamsNotificationService.sendLeadWonNotification(lead);
+        return ResponseEntity.ok(Map.of("status", "ok", "message", "Teams alert sent for: " + lead.getCustomerName()));
     }
 
     // ─── private helpers ─────────────────────────────────────────────────────
