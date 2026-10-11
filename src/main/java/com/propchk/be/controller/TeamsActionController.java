@@ -323,15 +323,19 @@ public class TeamsActionController {
      */
     @PostMapping("/bot")
     public ResponseEntity<Map<String, Object>> handleBotQuery(@RequestBody Map<String, Object> body) {
-        String text = body.getOrDefault("text", "help").toString().trim();
+        String rawText = body.getOrDefault("text", "help").toString();
+        // Strip HTML tags like <at>PropCheck</at> and leading bot mentions
+        String text = rawText.replaceAll("<[^>]*>", "").trim();
+        text = text.replaceAll("(?i)^@?propchk\\w*\\s*", "").trim();
+        if (text.isEmpty()) {
+            text = "help";
+        }
         String lower = text.toLowerCase();
 
         // 1. Help command
         if (lower.equals("help") || lower.equals("hi") || lower.equals("hello")) {
-            return ResponseEntity.ok(Map.of(
-                    "type", "AdaptiveCard",
-                    "card", teamsNotificationService.buildHelpMenuCard()
-            ));
+            Map<String, Object> card = teamsNotificationService.buildHelpMenuCard();
+            return ResponseEntity.ok(wrapCard(card));
         }
 
         // 2. Capacity command: e.g. "capacity Bangalore"
@@ -342,10 +346,8 @@ public class TeamsActionController {
                 city = parts[1];
             }
             List<DailyAvailability> availability = bookingService.getAvailabilityCalendar(city, LocalDate.now(), 4, "INSPECTION");
-            return ResponseEntity.ok(Map.of(
-                    "type", "AdaptiveCard",
-                    "card", teamsNotificationService.buildCapacityCard(city, availability)
-            ));
+            Map<String, Object> card = teamsNotificationService.buildCapacityCard(city, availability);
+            return ResponseEntity.ok(wrapCard(card));
         }
 
         // 3. Conflicts command: e.g. "conflicts"
@@ -365,6 +367,7 @@ public class TeamsActionController {
             }
 
             Map<String, Object> card = new LinkedHashMap<>();
+            card.put("$schema", "http://adaptivecards.io/schemas/adaptive-card.json");
             card.put("type", "AdaptiveCard");
             card.put("version", "1.4");
             card.put("body", List.of(
@@ -372,7 +375,7 @@ public class TeamsActionController {
                     Map.of("type", "FactSet", "facts", facts.isEmpty() ? List.of(Map.of("title", "Status", "value", "No active conflicts detected!")) : facts)
             ));
 
-            return ResponseEntity.ok(Map.of("type", "AdaptiveCard", "card", card));
+            return ResponseEntity.ok(wrapCard(card));
         }
 
         // 4. Lead search: e.g. "lead 6315" or "lead Hari" or just "Hari"
@@ -390,10 +393,8 @@ public class TeamsActionController {
 
         if (lead != null) {
             Booking active = bookingRepository.findActiveBookingsByLeadIds(List.of(lead.getId())).stream().findFirst().orElse(null);
-            return ResponseEntity.ok(Map.of(
-                    "type", "AdaptiveCard",
-                    "card", teamsNotificationService.buildLeadDetailCard(lead, active)
-            ));
+            Map<String, Object> card = teamsNotificationService.buildLeadDetailCard(lead, active);
+            return ResponseEntity.ok(wrapCard(card));
         }
 
         // Not found fallback
@@ -401,5 +402,15 @@ public class TeamsActionController {
                 "type", "message",
                 "text", "❌ No lead found matching: '" + query + "'. Type `help` to see available commands."
         ));
+    }
+
+    private Map<String, Object> wrapCard(Map<String, Object> card) {
+        return Map.of(
+                "type", "message",
+                "attachments", List.of(Map.of(
+                        "contentType", "application/vnd.microsoft.card.adaptive",
+                        "content", card
+                ))
+        );
     }
 }
