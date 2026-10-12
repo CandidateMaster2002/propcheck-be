@@ -324,9 +324,16 @@ public class TeamsActionController {
     @PostMapping("/bot")
     public ResponseEntity<Map<String, Object>> handleBotQuery(@RequestBody Map<String, Object> body) {
         String rawText = body.getOrDefault("text", "help").toString();
-        // Strip HTML tags like <at>PropCheck</at> and leading bot mentions
-        String text = rawText.replaceAll("<[^>]*>", "").trim();
-        text = text.replaceAll("(?i)^@?propchk\\w*\\s*", "").trim();
+        // 1. Replace HTML entities like &nbsp;, &#160;, \u00A0
+        String text = rawText.replaceAll("(?i)&nbsp;|&#160;|\\u00A0", " ");
+        // 2. Strip <at>...</at> tags including their content
+        text = text.replaceAll("(?i)<at>.*?</at>", " ");
+        // 3. Strip any remaining HTML tags
+        text = text.replaceAll("<[^>]*>", " ");
+        // 4. Strip any leading bot name prefix: @PropCheck, PropCheck, @PropChk, PropChk
+        text = text.replaceAll("(?i)^\\s*@?propch[e]?k\\w*\\s*", " ");
+        // 5. Normalize whitespace and trim
+        text = text.replaceAll("\\s+", " ").trim();
         if (text.isEmpty()) {
             text = "help";
         }
@@ -335,7 +342,7 @@ public class TeamsActionController {
         // 1. Help command
         if (lower.equals("help") || lower.equals("hi") || lower.equals("hello")) {
             Map<String, Object> card = teamsNotificationService.buildHelpMenuCard();
-            return ResponseEntity.ok(wrapCard(card));
+            return ResponseEntity.ok(wrapCard(card, "PropCheck Bot Command Menu"));
         }
 
         // 2. Capacity command: e.g. "capacity Bangalore"
@@ -347,7 +354,7 @@ public class TeamsActionController {
             }
             List<DailyAvailability> availability = bookingService.getAvailabilityCalendar(city, LocalDate.now(), 4, "INSPECTION");
             Map<String, Object> card = teamsNotificationService.buildCapacityCard(city, availability);
-            return ResponseEntity.ok(wrapCard(card));
+            return ResponseEntity.ok(wrapCard(card, "Slot Capacity: " + city));
         }
 
         // 3. Conflicts command: e.g. "conflicts"
@@ -375,7 +382,7 @@ public class TeamsActionController {
                     Map.of("type", "FactSet", "facts", facts.isEmpty() ? List.of(Map.of("title", "Status", "value", "No active conflicts detected!")) : facts)
             ));
 
-            return ResponseEntity.ok(wrapCard(card));
+            return ResponseEntity.ok(wrapCard(card, "Active Conflicts: " + conflicts.size()));
         }
 
         // 4. Lead search: e.g. "lead 6315" or "lead Hari" or just "Hari"
@@ -394,23 +401,26 @@ public class TeamsActionController {
         if (lead != null) {
             Booking active = bookingRepository.findActiveBookingsByLeadIds(List.of(lead.getId())).stream().findFirst().orElse(null);
             Map<String, Object> card = teamsNotificationService.buildLeadDetailCard(lead, active);
-            return ResponseEntity.ok(wrapCard(card));
+            return ResponseEntity.ok(wrapCard(card, "Lead Profile: " + (lead.getCustomerName() != null ? lead.getCustomerName() : query)));
         }
 
-        // Not found fallback
-        Map<String, Object> fallback = Map.of(
-                "type", "message",
-                "text", "❌ No lead found matching: '" + query + "'. Type `help` to see available commands."
+        // Not found fallback as a rich Adaptive Card
+        Map<String, Object> fallbackCard = Map.of(
+                "$schema", "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type", "AdaptiveCard",
+                "version", "1.4",
+                "body", List.of(
+                        Map.of("type", "TextBlock", "size", "Large", "weight", "Bolder", "text", "🔍 No Lead Found: " + query, "color", "Attention"),
+                        Map.of("type", "TextBlock", "text", "No customer found matching **'" + query + "'** in Zoho CRM.\n\nType `help` to see available commands or try searching by phone number.", "wrap", true)
+                )
         );
-        try {
-            teamsNotificationService.postToTeams(fallback);
-        } catch (Exception ignored) {}
-        return ResponseEntity.ok(fallback);
+        return ResponseEntity.ok(wrapCard(fallbackCard, "No lead found matching: " + query));
     }
 
-    private Map<String, Object> wrapCard(Map<String, Object> card) {
+    private Map<String, Object> wrapCard(Map<String, Object> card, String summaryText) {
         Map<String, Object> msg = Map.of(
                 "type", "message",
+                "text", summaryText != null ? summaryText : "",
                 "attachments", List.of(Map.of(
                         "contentType", "application/vnd.microsoft.card.adaptive",
                         "content", card
