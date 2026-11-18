@@ -56,6 +56,7 @@ public class BookingService {
     private final UserRepository userRepository;
     private final TeamsNotificationService teamsNotificationService;
     private final EmailService emailService;
+    private final AdminPortalSyncService adminPortalSyncService;
 
     public BookingService(BookingRepository bookingRepository,
                           EngineerRepository engineerRepository,
@@ -63,7 +64,8 @@ public class BookingService {
                           LeadRepository leadRepository,
                           UserRepository userRepository,
                           TeamsNotificationService teamsNotificationService,
-                          EmailService emailService) {
+                          EmailService emailService,
+                          AdminPortalSyncService adminPortalSyncService) {
         this.bookingRepository = bookingRepository;
         this.engineerRepository = engineerRepository;
         this.leaveRepository = leaveRepository;
@@ -71,6 +73,7 @@ public class BookingService {
         this.userRepository = userRepository;
         this.teamsNotificationService = teamsNotificationService;
         this.emailService = emailService;
+        this.adminPortalSyncService = adminPortalSyncService;
     }
 
     /**
@@ -462,6 +465,9 @@ public class BookingService {
                 lead.setValidatorRemarks(remarks.trim());
             }
             leadRepository.save(lead);
+
+            // Two-Way Sync: notify external Admin Portal that report has been validated
+            adminPortalSyncService.notifyValidationDone(lead, saved, remarks);
         });
         return saved;
     }
@@ -538,6 +544,9 @@ public class BookingService {
             if (customerEmail != null && !customerEmail.trim().isEmpty()) {
                 emailService.sendInspectionReportEmail(customerEmail, customerName, property, reportUrl, score);
             }
+
+            // Two-Way Sync: notify external Admin Portal that report has been dispatched
+            adminPortalSyncService.notifyReportSent(lead, saved, reportUrl);
         });
         return saved;
     }
