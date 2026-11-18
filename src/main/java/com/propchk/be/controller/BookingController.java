@@ -268,12 +268,12 @@ public class BookingController {
     }
 
     /** Mark report as sent */
-    @PutMapping("/{id}/report-sent")
+    @PutMapping(value = {"/{id}/report-sent", "/{id}/send-report"})
     public ResponseEntity<Booking> markReportSent(@PathVariable Long id) {
         return ResponseEntity.ok(bookingService.markReportSent(id));
     }
 
-    @PutMapping("/for-lead/{leadId}/report-sent")
+    @PutMapping(value = {"/for-lead/{leadId}/report-sent", "/for-lead/{leadId}/send-report"})
     public ResponseEntity<Booking> markReportSentByLead(@PathVariable Long leadId) {
         Booking active = getActiveBookingForLead(leadId);
         return ResponseEntity.ok(bookingService.markReportSent(active.getId()));

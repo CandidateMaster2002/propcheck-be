@@ -88,6 +88,34 @@ public class EmailService {
         }
     }
 
+    /**
+     * Sends the final Inspection Report email to the customer with direct portal access link.
+     */
+    public void sendInspectionReportEmail(String toEmail, String toName, String propertyAddress, String reportUrl, Integer insScore) {
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            log.warn("Cannot send inspection report email: recipient email is missing");
+            return;
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, "PropCheck Quality Team");
+            helper.setTo(toEmail);
+            helper.setSubject("Your PropCheck Inspection Report is Ready – " + (propertyAddress != null ? propertyAddress : "Property"));
+
+            String htmlBody = buildReportHtml(toName, propertyAddress, reportUrl, insScore);
+            helper.setText(htmlBody, true);
+
+            mailSender.send(message);
+            log.info("Inspection report email successfully sent to {}", toEmail);
+        } catch (MailException | MessagingException e) {
+            log.error("Failed to send inspection report email to {}: {}", toEmail, e.getMessage());
+        } catch (Exception e) {
+            log.error("Unexpected error sending inspection report email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
     // ─── HTML Builders ───────────────────────────────────────────────────────
 
     private String buildWelcomeHtml(String name, String propertyAddress) {
@@ -104,6 +132,35 @@ public class EmailService {
                 + "<a href='mailto:support@propcheck.in'>support@propcheck.in</a>.</p>"
                 + "<hr style='margin:24px 0;border:none;border-top:1px solid #e5e7eb;'/>"
                 + "<p style='font-size:12px;color:#9ca3af;'>PropCheck | Quality Property Inspections</p>"
+                + "</div></body></html>";
+    }
+
+    private String buildReportHtml(String name, String propertyAddress, String reportUrl, Integer insScore) {
+        String scoreDisplay = insScore != null ? (insScore + "%") : "Verified";
+        String viewUrl = (reportUrl != null && !reportUrl.trim().isEmpty()) ? reportUrl : (portalUrl + "/my-bookings");
+
+        return "<!DOCTYPE html><html><body style='font-family:Arial,sans-serif;color:#333;margin:0;padding:20px;'>"
+                + "<div style='max-width:620px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px;background:#ffffff;'>"
+                + "<div style='text-align:center;padding-bottom:16px;border-bottom:2px solid #2563eb;'>"
+                + "<h2 style='color:#1d4ed8;margin:0;'>PropCheck Quality Audit</h2>"
+                + "<p style='color:#6b7280;margin:4px 0 0;'>Official Property Inspection Report</p>"
+                + "</div>"
+                + "<p style='margin-top:20px;'>Dear <strong>" + escapeHtml(name != null ? name : "Homeowner") + "</strong>,</p>"
+                + "<p>We are pleased to inform you that the comprehensive quality audit for your property has been completed and verified by our quality validation team.</p>"
+                + "<table style='width:100%;border-collapse:collapse;margin:20px 0;background:#f8fafc;border-radius:6px;overflow:hidden;'>"
+                + "<tr><td style='padding:12px;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#475569;width:35%;'>Property</td>"
+                + "<td style='padding:12px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#0f172a;'>" + escapeHtml(propertyAddress != null ? propertyAddress : "N/A") + "</td></tr>"
+                + "<tr><td style='padding:12px;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#475569;'>Quality Rating Score</td>"
+                + "<td style='padding:12px;border-bottom:1px solid #e2e8f0;'><span style='background:#dbeafe;color:#1e40af;font-weight:bold;padding:4px 10px;border-radius:12px;'>" + scoreDisplay + " Satisfactory</span></td></tr>"
+                + "<tr><td style='padding:12px;font-weight:bold;color:#475569;'>Status</td>"
+                + "<td style='padding:12px;'><span style='background:#dcfce7;color:#166534;font-weight:bold;padding:4px 10px;border-radius:12px;'>Audit Passed &amp; Verified</span></td></tr>"
+                + "</table>"
+                + "<div style='text-align:center;margin:30px 0;'>"
+                + "<a href='" + viewUrl + "' style='background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 28px;border-radius:6px;display:inline-block;'>📋 View Full Inspection Report</a>"
+                + "</div>"
+                + "<p style='color:#64748b;font-size:14px;line-height:1.5;'>You can view detailed space-by-space observations, snag photographs, severity ratings, and material checks directly in your customer portal.</p>"
+                + "<hr style='margin:24px 0;border:none;border-top:1px solid #e5e7eb;'/>"
+                + "<p style='font-size:12px;color:#94a3b8;margin:0;'>PropCheck Inspection Services | Customer Support: support@propcheck.in</p>"
                 + "</div></body></html>";
     }
 

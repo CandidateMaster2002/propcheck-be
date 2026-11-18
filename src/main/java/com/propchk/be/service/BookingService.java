@@ -55,19 +55,22 @@ public class BookingService {
     private final LeadRepository leadRepository;
     private final UserRepository userRepository;
     private final TeamsNotificationService teamsNotificationService;
+    private final EmailService emailService;
 
     public BookingService(BookingRepository bookingRepository,
                           EngineerRepository engineerRepository,
                           EngineerLeaveRepository leaveRepository,
                           LeadRepository leadRepository,
                           UserRepository userRepository,
-                          TeamsNotificationService teamsNotificationService) {
+                          TeamsNotificationService teamsNotificationService,
+                          EmailService emailService) {
         this.bookingRepository = bookingRepository;
         this.engineerRepository = engineerRepository;
         this.leaveRepository = leaveRepository;
         this.leadRepository = leadRepository;
         this.userRepository = userRepository;
         this.teamsNotificationService = teamsNotificationService;
+        this.emailService = emailService;
     }
 
     /**
@@ -524,6 +527,17 @@ public class BookingService {
         leadRepository.findById(booking.getLeadId()).ifPresent(lead -> {
             lead.setReportStatus("Report Sent");
             leadRepository.save(lead);
+
+            // Automatically dispatch inspection report email to customer
+            String customerEmail = lead.getEmail();
+            String customerName = lead.getCustomerName();
+            String property = lead.getProjectName() != null ? (lead.getProjectName() + (lead.getFlatNo() != null ? " - " + lead.getFlatNo() : "")) : booking.getCity();
+            String reportUrl = booking.getReportUrl() != null ? booking.getReportUrl() : lead.getReportUrl();
+            Integer score = booking.getInsScore();
+
+            if (customerEmail != null && !customerEmail.trim().isEmpty()) {
+                emailService.sendInspectionReportEmail(customerEmail, customerName, property, reportUrl, score);
+            }
         });
         return saved;
     }
