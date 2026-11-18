@@ -29,28 +29,35 @@ public class DataSourceConfig {
     @Bean
     @Primary
     public DataSource dataSource() {
-        String dbUrl = System.getenv("SPRING_DATASOURCE_URL");
+        String dbUrl = clean(System.getenv("SPRING_DATASOURCE_URL"));
         if (dbUrl == null || dbUrl.isBlank()) {
             if (rawUrl != null && !rawUrl.isBlank() && !rawUrl.contains("localhost:5432")) {
-                dbUrl = rawUrl;
+                dbUrl = clean(rawUrl);
             } else if (System.getenv("DATABASE_URL") != null && !System.getenv("DATABASE_URL").isBlank()) {
-                dbUrl = System.getenv("DATABASE_URL");
+                dbUrl = clean(System.getenv("DATABASE_URL"));
             } else {
-                dbUrl = rawUrl;
+                dbUrl = clean(rawUrl);
             }
+        }
+
+        String username = clean(System.getenv("SPRING_DATASOURCE_USERNAME"));
+        if (username == null || username.isBlank()) {
+            username = clean(defaultUsername);
+        }
+
+        String password = clean(System.getenv("SPRING_DATASOURCE_PASSWORD"));
+        if (password == null || password.isBlank()) {
+            password = clean(defaultPassword);
         }
 
         HikariConfig config = new HikariConfig();
         config.setDriverClassName("org.postgresql.Driver");
 
-        // Normalize postgres:// or postgresql:// to standard JDBC URL and parse embedded auth
-        if (dbUrl != null && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
+        // Normalize postgres:// or postgresql:// (without jdbc:) to standard JDBC URL and parse embedded auth
+        if (dbUrl != null && (dbUrl.startsWith("postgres://") || (dbUrl.startsWith("postgresql://") && !dbUrl.startsWith("jdbc:")))) {
             try {
-                String clean = dbUrl.replaceFirst("^jdbc:", "");
-                URI uri = new URI(clean);
+                URI uri = new URI(dbUrl);
                 String userInfo = uri.getUserInfo();
-                String username = defaultUsername;
-                String password = defaultPassword;
                 if (userInfo != null && userInfo.contains(":")) {
                     String[] parts = userInfo.split(":", 2);
                     username = parts[0];
@@ -62,23 +69,27 @@ public class DataSourceConfig {
                 String path = uri.getPath();
                 String query = uri.getQuery();
 
-                String jdbcUrl = "jdbc:postgresql://" + host + ":" + port + path + (query != null ? "?" + query : "");
-                config.setJdbcUrl(jdbcUrl);
-                config.setUsername(username);
-                config.setPassword(password);
-                logger.info("Configured PostgreSQL DataSource from environment URI for host: {}, port: {}", host, port);
+                dbUrl = "jdbc:postgresql://" + host + ":" + port + path + (query != null ? "?" + query : "");
+                logger.info("Normalized PostgreSQL DataSource URL from URI for host: {}, port: {}", host, port);
             } catch (Exception e) {
                 logger.error("Failed to parse PostgreSQL URI, falling back to raw URL: {}", dbUrl, e);
-                config.setJdbcUrl(dbUrl);
-                config.setUsername(defaultUsername);
-                config.setPassword(defaultPassword);
             }
-        } else {
-            config.setJdbcUrl(dbUrl);
-            config.setUsername(defaultUsername);
-            config.setPassword(defaultPassword);
         }
 
+        config.setJdbcUrl(dbUrl);
+        config.setUsername(username);
+        config.setPassword(password);
+        logger.info("Initializing DataSource with URL: {}", dbUrl);
+
         return new HikariDataSource(config);
+    }
+
+    private String clean(String val) {
+        if (val == null) return null;
+        val = val.trim();
+        if ((val.startsWith("\"") && val.endsWith("\"")) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.substring(1, val.length() - 1).trim();
+        }
+        return val;
     }
 }
