@@ -50,7 +50,12 @@ public class ZohoLeadMapper {
             return null;
         }
 
-        Lead lead = leadRepository.findByZohoLeadId(zohoId).orElseGet(Lead::new);
+        String rawPhone = stringOrNull(record, "Phone");
+        String rawEmail = stringOrNull(record, "Email");
+
+        Lead lead = leadRepository.findByZohoLeadId(zohoId)
+                .or(() -> findExistingByPhoneOrEmail(rawPhone, rawEmail))
+                .orElseGet(Lead::new);
 
         lead.setZohoLeadId(zohoId);
         lead.setCustomerName(stringOrNull(record, "Full_Name"));
@@ -119,6 +124,28 @@ public class ZohoLeadMapper {
         }
 
         return saved;
+    }
+
+    private java.util.Optional<Lead> findExistingByPhoneOrEmail(String phone, String email) {
+        if (email != null && !email.trim().isEmpty() && !email.toLowerCase().contains("example.com")) {
+            java.util.Optional<Lead> byEmail = leadRepository.findFirstByEmailIgnoreCase(email.trim());
+            if (byEmail.isPresent()) {
+                logger.info("Deduplication: matched existing lead ID {} by email {}", byEmail.get().getId(), email);
+                return byEmail;
+            }
+        }
+        if (phone != null && !phone.trim().isEmpty()) {
+            String digits = phone.replaceAll("[^0-9]", "");
+            if (digits.length() >= 10) {
+                String last10 = digits.substring(digits.length() - 10);
+                List<Lead> byPhone = leadRepository.findByPhoneEndingWith(last10);
+                if (!byPhone.isEmpty()) {
+                    logger.info("Deduplication: matched existing lead ID {} by phone ending with {}", byPhone.get(0).getId(), last10);
+                    return java.util.Optional.of(byPhone.get(0));
+                }
+            }
+        }
+        return java.util.Optional.empty();
     }
 
     // ─── helper utilities ────────────────────────────────────────────────────

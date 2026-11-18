@@ -14,6 +14,10 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     
     Optional<Lead> findByEmail(String email);
 
+    Optional<Lead> findFirstByEmailIgnoreCase(String email);
+
+    List<Lead> findByPhoneEndingWith(String phoneDigits);
+
     List<Lead> findByCity(String city);
 
     Optional<Lead> findTopByZohoModifiedTimeIsNotNullOrderByZohoModifiedTimeDesc();
