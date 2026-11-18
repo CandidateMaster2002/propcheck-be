@@ -31,10 +31,13 @@ public class DataSourceConfig {
     public DataSource dataSource() {
         String dbUrl = System.getenv("SPRING_DATASOURCE_URL");
         if (dbUrl == null || dbUrl.isBlank()) {
-            dbUrl = System.getenv("DATABASE_URL");
-        }
-        if (dbUrl == null || dbUrl.isBlank()) {
-            dbUrl = rawUrl;
+            if (rawUrl != null && !rawUrl.isBlank() && !rawUrl.contains("localhost:5432")) {
+                dbUrl = rawUrl;
+            } else if (System.getenv("DATABASE_URL") != null && !System.getenv("DATABASE_URL").isBlank()) {
+                dbUrl = System.getenv("DATABASE_URL");
+            } else {
+                dbUrl = rawUrl;
+            }
         }
 
         HikariConfig config = new HikariConfig();
