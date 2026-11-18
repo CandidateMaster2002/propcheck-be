@@ -78,6 +78,20 @@ public class Booking {
     /** FK to User.id - who is currently scheduled/re-scheduled the booking */
     private Long scheduledByUserId;
 
+    /** External inspection report PDF URL */
+    @Column(length = 2000)
+    private String reportUrl;
+
+    /** Inspection health rating percentage score */
+    private Integer insScore;
+
+    /** Remarks logged by quality validator */
+    @Column(length = 2000)
+    private String validatorRemarks;
+
+    /** Timestamp when validator approved the inspection */
+    private Instant validatedAt;
+
     private Instant createdAt;
     private Instant updatedAt;
 }

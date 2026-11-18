@@ -147,27 +147,84 @@ public class BookingController {
     }
 
     /** Mark inspection as completed */
+    /** Mark inspection as completed */
     @PutMapping("/{id}/mark-done")
-    public ResponseEntity<Booking> markInspectionDone(@PathVariable Long id) {
-        return ResponseEntity.ok(bookingService.markInspectionDone(id));
+    public ResponseEntity<Booking> markInspectionDone(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, Object> payload) {
+        String reportUrl = payload != null && payload.get("reportUrl") != null ? payload.get("reportUrl").toString() : null;
+        Integer insScore = null;
+        if (payload != null && payload.get("insScore") != null) {
+            try { insScore = Integer.parseInt(payload.get("insScore").toString()); } catch (Exception ignored) {}
+        }
+        return ResponseEntity.ok(bookingService.markInspectionDone(id, reportUrl, insScore));
     }
 
     @PutMapping("/for-lead/{leadId}/mark-done")
-    public ResponseEntity<Booking> markInspectionDoneByLead(@PathVariable Long leadId) {
+    public ResponseEntity<Booking> markInspectionDoneByLead(
+            @PathVariable Long leadId,
+            @RequestBody(required = false) java.util.Map<String, Object> payload) {
         Booking active = getActiveBookingForLead(leadId);
-        return ResponseEntity.ok(bookingService.markInspectionDone(active.getId()));
+        String reportUrl = payload != null && payload.get("reportUrl") != null ? payload.get("reportUrl").toString() : null;
+        Integer insScore = null;
+        if (payload != null && payload.get("insScore") != null) {
+            try { insScore = Integer.parseInt(payload.get("insScore").toString()); } catch (Exception ignored) {}
+        }
+        return ResponseEntity.ok(bookingService.markInspectionDone(active.getId(), reportUrl, insScore));
     }
 
     /** Mark validation as completed */
     @PutMapping("/{id}/mark-validation-done")
-    public ResponseEntity<Booking> markValidationDone(@PathVariable Long id) {
-        return ResponseEntity.ok(bookingService.markValidationDone(id));
+    public ResponseEntity<Booking> markValidationDone(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, Object> payload) {
+        String remarks = payload != null && payload.get("remarks") != null ? payload.get("remarks").toString() : null;
+        return ResponseEntity.ok(bookingService.markValidationDone(id, remarks));
     }
 
     @PutMapping("/for-lead/{leadId}/mark-validation-done")
-    public ResponseEntity<Booking> markValidationDoneByLead(@PathVariable Long leadId) {
+    public ResponseEntity<Booking> markValidationDoneByLead(
+            @PathVariable Long leadId,
+            @RequestBody(required = false) java.util.Map<String, Object> payload) {
         Booking active = getActiveBookingForLead(leadId);
-        return ResponseEntity.ok(bookingService.markValidationDone(active.getId()));
+        String remarks = payload != null && payload.get("remarks") != null ? payload.get("remarks").toString() : null;
+        return ResponseEntity.ok(bookingService.markValidationDone(active.getId(), remarks));
+    }
+
+    /** Webhook for External Admin Portal to report inspection completion directly */
+    @PostMapping("/webhooks/completed")
+    public ResponseEntity<java.util.Map<String, Object>> inspectionCompletedWebhook(
+            @RequestBody java.util.Map<String, Object> payload) {
+        Long leadId = null;
+        Long bookingId = null;
+        if (payload.get("leadId") != null) {
+            try { leadId = Long.parseLong(payload.get("leadId").toString()); } catch (Exception ignored) {}
+        }
+        if (payload.get("bookingId") != null) {
+            try { bookingId = Long.parseLong(payload.get("bookingId").toString()); } catch (Exception ignored) {}
+        }
+        String reportUrl = payload.get("reportUrl") != null ? payload.get("reportUrl").toString() : null;
+        Integer insScore = null;
+        if (payload.get("insScore") != null) {
+            try { insScore = Integer.parseInt(payload.get("insScore").toString()); } catch (Exception ignored) {}
+        }
+
+        Booking booking;
+        if (bookingId != null) {
+            booking = bookingService.markInspectionDone(bookingId, reportUrl, insScore);
+        } else if (leadId != null) {
+            Booking active = getActiveBookingForLead(leadId);
+            booking = bookingService.markInspectionDone(active.getId(), reportUrl, insScore);
+        } else {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "Either leadId or bookingId must be provided in webhook payload"));
+        }
+
+        return ResponseEntity.ok(java.util.Map.of(
+            "status", "SUCCESS",
+            "message", "Inspection successfully marked as done in PropCheck",
+            "bookingId", booking.getId(),
+            "bookingStatus", booking.getStatus()
+        ));
     }
 
     /** VALIDATOR: Approve a completed inspection report */

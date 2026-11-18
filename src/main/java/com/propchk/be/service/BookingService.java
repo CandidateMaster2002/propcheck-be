@@ -407,9 +407,19 @@ public class BookingService {
      * Mark an inspection as completed.
      */
     public Booking markInspectionDone(Long bookingId) {
+        return markInspectionDone(bookingId, null, null);
+    }
+
+    public Booking markInspectionDone(Long bookingId, String reportUrl, Integer insScore) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         booking.setStatus("INSPECTION_DONE");
+        if (reportUrl != null && !reportUrl.trim().isEmpty()) {
+            booking.setReportUrl(reportUrl.trim());
+        }
+        if (insScore != null) {
+            booking.setInsScore(insScore);
+        }
         booking.setUpdatedAt(Instant.now());
         Booking saved = bookingRepository.save(booking);
 
@@ -424,6 +434,10 @@ public class BookingService {
      * Mark the report as validated but held back (e.g., waiting for payment).
      */
     public Booking markValidationDone(Long bookingId) {
+        return markValidationDone(bookingId, null);
+    }
+
+    public Booking markValidationDone(Long bookingId, String remarks) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         
@@ -432,11 +446,18 @@ public class BookingService {
         }
 
         booking.setStatus("VALIDATION_DONE");
+        if (remarks != null && !remarks.trim().isEmpty()) {
+            booking.setValidatorRemarks(remarks.trim());
+        }
+        booking.setValidatedAt(Instant.now());
         booking.setUpdatedAt(Instant.now());
         Booking saved = bookingRepository.save(booking);
 
         leadRepository.findById(booking.getLeadId()).ifPresent(lead -> {
             lead.setReportStatus("Validation Done");
+            if (remarks != null && !remarks.trim().isEmpty()) {
+                lead.setValidatorRemarks(remarks.trim());
+            }
             leadRepository.save(lead);
         });
         return saved;

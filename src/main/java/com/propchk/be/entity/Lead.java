@@ -40,6 +40,10 @@ public class Lead {
     private String remarks;
     
     private String validatorName;
+    @Column(length = 2000)
+    private String validatorRemarks;
+    @Column(length = 2000)
+    private String reportUrl;
     private String digitalTwinTagging;
     private String reportStatus;
     private String emailApproval;
