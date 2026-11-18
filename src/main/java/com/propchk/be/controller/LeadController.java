@@ -90,10 +90,13 @@ public class LeadController {
                         l.setInspectionDateAndTime(b.getDate() + " " + b.getSlotTime());
                     }
                 } else {
-                    if (inactiveMap.containsKey(l.getId())) {
-                        l.setCurrentBookingStatus("POSTPONED_CANCELLED");
+                    com.propchk.be.entity.Booking inb = inactiveMap.get(l.getId());
+                    if (inb != null && "POSTPONED".equals(inb.getStatus())) {
+                        l.setCurrentBookingStatus("POSTPONED");
+                    } else if (inb != null) {
+                        l.setCurrentBookingStatus("CANCELLED");
                     } else {
-                        l.setCurrentBookingStatus("UNBOOKED");
+                        l.setCurrentBookingStatus("NOT_SCHEDULED");
                     }
                 }
             }

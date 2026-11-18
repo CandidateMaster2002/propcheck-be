@@ -37,7 +37,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     /** Check if a lead already has a booking of a given type (INSPECTION or REINSPECTION) */
     @Query("SELECT COUNT(b) > 0 FROM Booking b WHERE b.leadId = :leadId " +
            "AND b.bookingType = :type " +
-           "AND b.status NOT IN ('CANCELLED')")
+           "AND b.status NOT IN ('CANCELLED', 'POSTPONED')")
     boolean existsActiveBookingForLeadAndType(
             @Param("leadId") Long leadId,
             @Param("type") String bookingType);

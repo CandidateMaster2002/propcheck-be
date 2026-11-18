@@ -27,8 +27,12 @@ public class BookingService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookingService.class);
 
-    private static final Set<String> VALID_MORNING_TIMES = Set.of("10:00", "10:30", "11:00", "11:30");
-    private static final Set<String> VALID_EVENING_TIMES = Set.of("14:00", "14:30", "15:00", "15:30", "16:00");
+    private static final Set<String> VALID_MORNING_TIMES = Set.of(
+            "09:30", "9:30", "10:00", "10:30", "11:00", "11:30"
+    );
+    private static final Set<String> VALID_EVENING_TIMES = Set.of(
+            "13:30", "1:30", "14:00", "2:00", "14:30", "2:30", "15:00", "15:30", "16:00"
+    );
 
     /**
      * Cities where PropCheck has resident engineers.
@@ -195,10 +199,12 @@ public class BookingService {
                 "Booking not allowed: this lead has been refunded. Please contact the sales team.");
         }
 
-        // 2. Unpaid leads can only be booked by Sales/City Head/Admin — not by customer
-        if ("CUSTOMER".equals(role) && "Unpaid".equals(paymentStatus)) {
+        // 2. Partial paid guard: Only City Lead / Admin can schedule partially paid or unupdated leads
+        boolean isCityLeadOrAdmin = "CITY_HEAD".equals(role) || "CITY_LEAD".equals(role) || "ADMIN".equals(role);
+        if (!isCityLeadOrAdmin && !"Fully Paid".equalsIgnoreCase(paymentStatus)) {
             throw new RuntimeException(
-                "Booking not allowed: your payment is pending. Please complete the payment to proceed.");
+                "Booking not allowed: This lead is " + (paymentStatus != null ? paymentStatus : "not fully paid") + 
+                ". Partially paid leads can only be scheduled by a City Lead.");
         }
 
         // DUPLICATE ACTIVE BOOKING GUARD (applies to ALL roles)
@@ -347,22 +353,52 @@ public class BookingService {
     }
 
     /**
-     * Cancel a booking.
+     * Cancel a booking with mandatory/optional reason.
      */
     public Booking cancelBooking(Long bookingId) {
+        return cancelBooking(bookingId, "No reason provided", "Operations / Portal");
+    }
+
+    public Booking cancelBooking(Long bookingId, String reason, String cancelledBy) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         booking.setStatus("CANCELLED");
+        booking.setCancelReason(reason != null && !reason.trim().isEmpty() ? reason : "Cancelled via portal");
+        booking.setEngineerEmployeeNumber(null); // free up engineer
         booking.setUpdatedAt(Instant.now());
         Booking saved = bookingRepository.save(booking);
 
         leadRepository.findById(saved.getLeadId()).ifPresent(lead -> {
+            lead.setInspectionDateAndTime("CANCELLED");
+            leadRepository.save(lead);
             try {
-                teamsNotificationService.sendCancellationAlertNotification(saved, lead, "Operations / Portal");
+                teamsNotificationService.sendCancellationAlertNotification(saved, lead, cancelledBy != null ? cancelledBy : "Operations / Portal");
             } catch (Exception e) {
                 logger.error("Failed to send Teams cancellation notification: {}", e.getMessage());
             }
         });
+        return saved;
+    }
+
+    /**
+     * Postpone a booking with a remark. Frees up the engineer while keeping lead active for rescheduling.
+     */
+    public Booking postponeBooking(Long bookingId, String remark, Long userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+        
+        booking.setStatus("POSTPONED");
+        booking.setPostponeReason(remark != null && !remark.trim().isEmpty() ? remark : "Postponed by user");
+        booking.setEngineerEmployeeNumber(null); // free up engineer
+        booking.setUpdatedAt(Instant.now());
+        Booking saved = bookingRepository.save(booking);
+
+        leadRepository.findById(saved.getLeadId()).ifPresent(lead -> {
+            lead.setInspectionDateAndTime("POSTPONED");
+            leadRepository.save(lead);
+        });
+
+        logger.info("Booking {} postponed with remark: '{}' by User {}", bookingId, remark, userId);
         return saved;
     }
 
@@ -402,6 +438,49 @@ public class BookingService {
             lead.setReportStatus("Validation Done");
             leadRepository.save(lead);
         });
+        return saved;
+    }
+
+    /**
+     * VALIDATOR action — Approve a completed inspection report.
+     * Transitions status: COMPLETED → APPROVED
+     */
+    public Booking approveReport(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+        if (!"COMPLETED".equals(booking.getStatus()) && !"INSPECTION_DONE".equals(booking.getStatus())) {
+            throw new RuntimeException("Only COMPLETED or INSPECTION_DONE bookings can be approved. Current: " + booking.getStatus());
+        }
+        booking.setStatus("APPROVED");
+        booking.setUpdatedAt(Instant.now());
+        Booking saved = bookingRepository.save(booking);
+        leadRepository.findById(booking.getLeadId()).ifPresent(lead -> {
+            lead.setReportStatus("Report Approved");
+            leadRepository.save(lead);
+        });
+        logger.info("Booking {} approved by validator.", bookingId);
+        return saved;
+    }
+
+    /**
+     * VALIDATOR action — Reject a completed inspection report with remarks.
+     * Transitions status: COMPLETED → REJECTED (inspector must redo/update report)
+     */
+    public Booking rejectReport(Long bookingId, String remarks) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+        if (!"COMPLETED".equals(booking.getStatus()) && !"INSPECTION_DONE".equals(booking.getStatus())) {
+            throw new RuntimeException("Only COMPLETED or INSPECTION_DONE bookings can be rejected. Current: " + booking.getStatus());
+        }
+        booking.setStatus("REJECTED");
+        booking.setCancelReason(remarks != null && !remarks.trim().isEmpty() ? remarks : "Rejected by validator");
+        booking.setUpdatedAt(Instant.now());
+        Booking saved = bookingRepository.save(booking);
+        leadRepository.findById(booking.getLeadId()).ifPresent(lead -> {
+            lead.setReportStatus("Report Rejected");
+            leadRepository.save(lead);
+        });
+        logger.info("Booking {} rejected by validator with remarks: '{}'", bookingId, remarks);
         return saved;
     }
 

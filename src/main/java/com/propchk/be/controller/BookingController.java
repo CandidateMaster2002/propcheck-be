@@ -110,16 +110,40 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.assignEngineer(active.getId(), request));
     }
 
-    /** Cancel a booking */
+    /** Cancel a booking with reason */
     @PutMapping("/{id}/cancel")
-    public ResponseEntity<Booking> cancelBooking(@PathVariable Long id) {
-        return ResponseEntity.ok(bookingService.cancelBooking(id));
+    public ResponseEntity<Booking> cancelBooking(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "Cancelled via portal") String reason,
+            @RequestParam(required = false, defaultValue = "Operations / Portal") String cancelledBy) {
+        return ResponseEntity.ok(bookingService.cancelBooking(id, reason, cancelledBy));
     }
 
     @PutMapping("/for-lead/{leadId}/cancel")
-    public ResponseEntity<Booking> cancelBookingByLead(@PathVariable Long leadId) {
+    public ResponseEntity<Booking> cancelBookingByLead(
+            @PathVariable Long leadId,
+            @RequestParam(required = false, defaultValue = "Cancelled via portal") String reason,
+            @RequestParam(required = false, defaultValue = "Operations / Portal") String cancelledBy) {
         Booking active = getActiveBookingForLead(leadId);
-        return ResponseEntity.ok(bookingService.cancelBooking(active.getId()));
+        return ResponseEntity.ok(bookingService.cancelBooking(active.getId(), reason, cancelledBy));
+    }
+
+    /** Postpone a booking with remark */
+    @PutMapping("/{id}/postpone")
+    public ResponseEntity<Booking> postponeBooking(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "Postponed via portal") String remark,
+            @RequestParam(required = false, defaultValue = "1") Long userId) {
+        return ResponseEntity.ok(bookingService.postponeBooking(id, remark, userId));
+    }
+
+    @PutMapping("/for-lead/{leadId}/postpone")
+    public ResponseEntity<Booking> postponeBookingByLead(
+            @PathVariable Long leadId,
+            @RequestParam(required = false, defaultValue = "Postponed via portal") String remark,
+            @RequestParam(required = false, defaultValue = "1") Long userId) {
+        Booking active = getActiveBookingForLead(leadId);
+        return ResponseEntity.ok(bookingService.postponeBooking(active.getId(), remark, userId));
     }
 
     /** Mark inspection as completed */
@@ -144,6 +168,20 @@ public class BookingController {
     public ResponseEntity<Booking> markValidationDoneByLead(@PathVariable Long leadId) {
         Booking active = getActiveBookingForLead(leadId);
         return ResponseEntity.ok(bookingService.markValidationDone(active.getId()));
+    }
+
+    /** VALIDATOR: Approve a completed inspection report */
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<Booking> approveReport(@PathVariable Long id) {
+        return ResponseEntity.ok(bookingService.approveReport(id));
+    }
+
+    /** VALIDATOR: Reject a completed inspection report with remarks */
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<Booking> rejectReport(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "Rejected by validator") String remarks) {
+        return ResponseEntity.ok(bookingService.rejectReport(id, remarks));
     }
 
     /** Mark report as sent */

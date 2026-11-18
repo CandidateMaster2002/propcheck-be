@@ -67,6 +67,14 @@ public class Booking {
 
     private Instant conflictDetectedAt;
 
+    /** Populated when status = POSTPONED */
+    @Column(length = 1000)
+    private String postponeReason;
+
+    /** Populated when status = CANCELLED */
+    @Column(length = 1000)
+    private String cancelReason;
+
     /** FK to User.id - who is currently scheduled/re-scheduled the booking */
     private Long scheduledByUserId;
 

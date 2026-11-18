@@ -159,6 +159,6 @@ public class ZohoLeadMapper {
         
         if (pending != null && pending <= 100) return "Fully Paid";
         if (received != null && received > 0) return "Partially Paid";
-        return "Unpaid";
+        return "Data Not Updated";
     }
 }

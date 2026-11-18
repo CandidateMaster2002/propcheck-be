@@ -4,5 +4,7 @@ public enum Role {
     ADMIN,
     SALES,
     CITY_HEAD,
-    CUSTOMER
+    CITY_LEAD,
+    CUSTOMER,
+    VALIDATOR
 }

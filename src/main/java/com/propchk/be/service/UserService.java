@@ -53,6 +53,22 @@ public class UserService {
         return mapToSummary(user);
     }
 
+    public UserSummary createValidatorUser(CreateSalesRequest req) {
+        if (userRepository.existsByEmail(req.getEmail())) {
+            throw new DuplicateEmailException("Email already exists");
+        }
+
+        User user = new User();
+        user.setName(req.getName());
+        user.setEmail(req.getEmail());
+        user.setPassword(req.getPassword());
+        user.setRole(Role.VALIDATOR);
+        user.setCity(null);
+
+        user = userRepository.save(user);
+        return mapToSummary(user);
+    }
+
     public List<UserSummary> listUsers(String roleFilter) {
         List<User> users;
         if (roleFilter == null || roleFilter.trim().isEmpty()) {

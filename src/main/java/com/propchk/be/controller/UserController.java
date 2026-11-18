@@ -33,6 +33,12 @@ public class UserController {
         return new ResponseEntity<>(summary, HttpStatus.CREATED);
     }
 
+    @PostMapping("/validator")
+    public ResponseEntity<UserSummary> createValidatorUser(@Valid @RequestBody CreateSalesRequest request) {
+        UserSummary summary = userService.createValidatorUser(request);
+        return new ResponseEntity<>(summary, HttpStatus.CREATED);
+    }
+
     @GetMapping
     public ResponseEntity<List<UserSummary>> listUsers(@RequestParam(required = false, name = "role") String role) {
         List<UserSummary> users = userService.listUsers(role);
