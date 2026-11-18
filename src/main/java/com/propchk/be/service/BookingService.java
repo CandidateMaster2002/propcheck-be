@@ -27,12 +27,8 @@ public class BookingService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookingService.class);
 
-    private static final Set<String> VALID_MORNING_TIMES = Set.of(
-            "09:30", "9:30", "10:00", "10:30", "11:00", "11:30"
-    );
-    private static final Set<String> VALID_EVENING_TIMES = Set.of(
-            "13:30", "1:30", "14:00", "2:00", "14:30", "2:30", "15:00", "15:30", "16:00"
-    );
+    private static final Set<String> MORNING_SLOTS = Set.of("09:30", "10:00", "10:30");
+    private static final Set<String> EVENING_SLOTS = Set.of("13:30", "14:00", "14:30");
 
     /**
      * Cities where PropCheck has resident engineers.
@@ -607,14 +603,12 @@ public class BookingService {
 
 
 
-    private void validateSlotTime(String slot, String slotTime) {
-        if ("MORNING".equals(slot) && !VALID_MORNING_TIMES.contains(slotTime)) {
-            throw new RuntimeException("Invalid morning slot time: " + slotTime
-                + ". Valid times: " + VALID_MORNING_TIMES);
+    public void validateSlotTime(String slot, String slotTime) {
+        if ("MORNING".equalsIgnoreCase(slot) && !MORNING_SLOTS.contains(slotTime)) {
+            throw new IllegalArgumentException("Invalid morning slot time: " + slotTime + ". Allowed: 09:30, 10:00, 10:30");
         }
-        if ("EVENING".equals(slot) && !VALID_EVENING_TIMES.contains(slotTime)) {
-            throw new RuntimeException("Invalid evening slot time: " + slotTime
-                + ". Valid times: " + VALID_EVENING_TIMES);
+        if ("EVENING".equalsIgnoreCase(slot) && !EVENING_SLOTS.contains(slotTime)) {
+            throw new IllegalArgumentException("Invalid evening slot time: " + slotTime + ". Allowed: 13:30, 14:00, 14:30");
         }
     }
 
