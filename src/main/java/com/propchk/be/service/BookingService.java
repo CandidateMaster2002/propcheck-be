@@ -15,7 +15,9 @@ import com.propchk.be.repository.LeadRepository;
 import com.propchk.be.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -185,22 +187,25 @@ public class BookingService {
         User creator = userRepository.findById(req.getCreatedByUserId())
                 .orElseThrow(() -> new RuntimeException("User not found: " + req.getCreatedByUserId()));
 
-        String role = creator.getRole().name();
+        String role = creator.getRole() != null ? creator.getRole().name() : "CUSTOMER";
         String paymentStatus = lead.getPaymentStatus();
 
-        // PAYMENT STATUS GUARDS (applies to ALL roles)
+        // PAYMENT STATUS GUARDS
         // 1. Refunded leads cannot be booked by anyone
-        if ("Refunded".equals(paymentStatus)) {
-            throw new RuntimeException(
+        if ("Refunded".equalsIgnoreCase(paymentStatus)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
                 "Booking not allowed: this lead has been refunded. Please contact the sales team.");
         }
 
-        // 2. Partial paid guard: Only City Lead / Admin can schedule partially paid or unupdated leads
-        boolean isCityLeadOrAdmin = "CITY_HEAD".equals(role) || "CITY_LEAD".equals(role) || "ADMIN".equals(role);
-        if (!isCityLeadOrAdmin && !"Fully Paid".equalsIgnoreCase(paymentStatus)) {
-            throw new RuntimeException(
-                "Booking not allowed: This lead is " + (paymentStatus != null ? paymentStatus : "not fully paid") + 
-                ". Partially paid leads can only be scheduled by a City Lead.");
+        // 2. Partial paid guard: Only City Lead / Admin has permission to schedule inspections for partially paid leads
+        if (!"Fully Paid".equalsIgnoreCase(paymentStatus)) {
+            if ("CUSTOMER".equalsIgnoreCase(role) || "SALES".equalsIgnoreCase(role)) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, 
+                    "Only City Lead has permission to schedule inspections for partially paid leads."
+                );
+            }
         }
 
         // DUPLICATE ACTIVE BOOKING GUARD (applies to ALL roles)
