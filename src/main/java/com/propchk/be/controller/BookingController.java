@@ -203,6 +203,32 @@ public class BookingController {
         if (payload.get("bookingId") != null) {
             try { bookingId = Long.parseLong(payload.get("bookingId").toString()); } catch (Exception ignored) {}
         }
+
+        // Fallback matching by customer phone or email if leadId/bookingId not directly supplied
+        if (bookingId == null && leadId == null) {
+            String phone = payload.get("ownerPhone") != null ? payload.get("ownerPhone").toString() : (payload.get("phone") != null ? payload.get("phone").toString() : null);
+            String email = payload.get("ownerEmail") != null ? payload.get("ownerEmail").toString() : (payload.get("email") != null ? payload.get("email").toString() : null);
+            if (phone != null && !phone.trim().isEmpty()) {
+                String cleanDigits = phone.replaceAll("[^0-9]", "");
+                if (cleanDigits.length() >= 10) {
+                    cleanDigits = cleanDigits.substring(cleanDigits.length() - 10);
+                }
+                var leads = leadRepository.findByPhoneEndingWith(cleanDigits);
+                if (!leads.isEmpty()) {
+                    leadId = leads.get(0).getId();
+                }
+            }
+            if (leadId == null && email != null && !email.trim().isEmpty()) {
+                leadRepository.findFirstByEmailIgnoreCase(email.trim()).ifPresent(l -> {
+                    // assigned via lambda below
+                });
+                var leadOpt = leadRepository.findFirstByEmailIgnoreCase(email.trim());
+                if (leadOpt.isPresent()) {
+                    leadId = leadOpt.get().getId();
+                }
+            }
+        }
+
         String reportUrl = payload.get("reportUrl") != null ? payload.get("reportUrl").toString() : null;
         Integer insScore = null;
         if (payload.get("insScore") != null) {
@@ -216,7 +242,7 @@ public class BookingController {
             Booking active = getActiveBookingForLead(leadId);
             booking = bookingService.markInspectionDone(active.getId(), reportUrl, insScore);
         } else {
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", "Either leadId or bookingId must be provided in webhook payload"));
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "Could not resolve booking: leadId, bookingId, phone, or email must be provided in webhook payload"));
         }
 
         return ResponseEntity.ok(java.util.Map.of(
