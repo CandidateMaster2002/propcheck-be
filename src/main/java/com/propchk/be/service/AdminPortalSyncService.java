@@ -40,6 +40,92 @@ public class AdminPortalSyncService {
     }
 
     /**
+     * Notify Admin Portal that a new booking has been created/scheduled.
+     */
+    public void notifyBookingCreated(Lead lead, Booking booking) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "BOOKING_CREATED");
+            payload.put("leadId", lead != null ? lead.getId() : null);
+            payload.put("bookingId", booking != null ? booking.getId() : null);
+            payload.put("phone", lead != null ? lead.getPhone() : null);
+            payload.put("email", lead != null ? lead.getEmail() : null);
+            payload.put("customerName", lead != null ? lead.getCustomerName() : null);
+            payload.put("city", booking != null ? booking.getCity() : (lead != null ? lead.getCity() : null));
+            payload.put("projectName", lead != null ? lead.getProjectName() : null);
+            payload.put("unitNo", lead != null ? lead.getFlatNo() : null);
+            payload.put("bhkType", lead != null ? lead.getBhkType() : null);
+            payload.put("inspectionDate", booking != null && booking.getDate() != null ? booking.getDate().toString() : null);
+            payload.put("slotTime", booking != null ? booking.getSlotTime() : null);
+            payload.put("slot", booking != null ? booking.getSlot() : null);
+            payload.put("inspectionCost", lead != null ? lead.getInspectionCost() : null);
+
+            sendWebhook(payload);
+        } catch (Exception e) {
+            log.warn("Failed to notify Admin Portal of BOOKING_CREATED: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Notify Admin Portal that an engineer has been assigned to the booking.
+     */
+    public void notifyEngineerAssigned(Lead lead, Booking booking, com.propchk.be.entity.Engineer engineer) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "ENGINEER_ASSIGNED");
+            payload.put("leadId", lead != null ? lead.getId() : null);
+            payload.put("bookingId", booking != null ? booking.getId() : null);
+            payload.put("phone", lead != null ? lead.getPhone() : null);
+            payload.put("email", lead != null ? lead.getEmail() : null);
+            payload.put("engineerName", engineer != null ? engineer.getName() : null);
+            payload.put("engineerEmail", engineer != null ? engineer.getEmail() : null);
+            payload.put("engineerNumber", engineer != null ? engineer.getEmployeeNumber() : null);
+
+            sendWebhook(payload);
+        } catch (Exception e) {
+            log.warn("Failed to notify Admin Portal of ENGINEER_ASSIGNED: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Notify Admin Portal that a booking has been postponed.
+     */
+    public void notifyBookingPostponed(Lead lead, Booking booking, String reason) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "POSTPONED");
+            payload.put("leadId", lead != null ? lead.getId() : null);
+            payload.put("bookingId", booking != null ? booking.getId() : null);
+            payload.put("phone", lead != null ? lead.getPhone() : null);
+            payload.put("email", lead != null ? lead.getEmail() : null);
+            payload.put("postponeReason", reason);
+
+            sendWebhook(payload);
+        } catch (Exception e) {
+            log.warn("Failed to notify Admin Portal of POSTPONED: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Notify Admin Portal that a booking has been cancelled.
+     */
+    public void notifyBookingCancelled(Lead lead, Booking booking, String reason) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("event", "CANCELLED");
+            payload.put("leadId", lead != null ? lead.getId() : null);
+            payload.put("bookingId", booking != null ? booking.getId() : null);
+            payload.put("phone", lead != null ? lead.getPhone() : null);
+            payload.put("email", lead != null ? lead.getEmail() : null);
+            payload.put("cancelReason", reason);
+
+            sendWebhook(payload);
+        } catch (Exception e) {
+            log.warn("Failed to notify Admin Portal of CANCELLED: {}", e.getMessage());
+        }
+    }
+
+    /**
      * Notify Admin Portal that the inspection report was reviewed and marked as VALIDATION_DONE.
      */
     public void notifyValidationDone(Lead lead, Booking booking, String remarks) {

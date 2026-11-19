@@ -290,6 +290,9 @@ public class BookingService {
         lead.setBookedBy(creator.getName());
         leadRepository.save(lead);
 
+        // Two-Way Sync: Notify external B2C Admin Portal
+        adminPortalSyncService.notifyBookingCreated(lead, saved);
+
         logger.info("Booking created — ID {} | Lead {} | {} | {} {} | {} | Status: {}",
                 saved.getId(), lead.getCustomerName(), req.getCity(),
                 req.getDate(), req.getSlot(), req.getBookingType(), status);
@@ -354,6 +357,14 @@ public class BookingService {
         booking.setConflictDetectedAt(null);
         booking.setUpdatedAt(Instant.now());
         Booking saved = bookingRepository.save(booking);
+
+        // Two-Way Sync: Notify external B2C Admin Portal
+        leadRepository.findById(saved.getLeadId()).ifPresent(lead -> {
+            engineerRepository.findByEmployeeNumber(req.getEngineerEmployeeNumber()).ifPresent(eng -> {
+                adminPortalSyncService.notifyEngineerAssigned(lead, saved, eng);
+            });
+        });
+
         logger.info("Booking {} confirmed — Engineer {} assigned by City Head {}",
                 bookingId, req.getEngineerEmployeeNumber(), req.getCityHeadUserId());
         return saved;
@@ -378,6 +389,7 @@ public class BookingService {
         leadRepository.findById(saved.getLeadId()).ifPresent(lead -> {
             lead.setInspectionDateAndTime("CANCELLED");
             leadRepository.save(lead);
+            adminPortalSyncService.notifyBookingCancelled(lead, saved, reason);
             try {
                 teamsNotificationService.sendCancellationAlertNotification(saved, lead, cancelledBy != null ? cancelledBy : "Operations / Portal");
             } catch (Exception e) {
@@ -403,6 +415,7 @@ public class BookingService {
         leadRepository.findById(saved.getLeadId()).ifPresent(lead -> {
             lead.setInspectionDateAndTime("POSTPONED");
             leadRepository.save(lead);
+            adminPortalSyncService.notifyBookingPostponed(lead, saved, remark);
         });
 
         logger.info("Booking {} postponed with remark: '{}' by User {}", bookingId, remark, userId);
@@ -488,6 +501,7 @@ public class BookingService {
         leadRepository.findById(booking.getLeadId()).ifPresent(lead -> {
             lead.setReportStatus("Report Approved");
             leadRepository.save(lead);
+            adminPortalSyncService.notifyValidationDone(lead, saved, "Report Approved by Validator");
         });
         logger.info("Booking {} approved by validator.", bookingId);
         return saved;
