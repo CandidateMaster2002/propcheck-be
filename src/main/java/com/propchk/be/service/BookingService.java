@@ -536,15 +536,25 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
         
-        if (!"VALIDATION_DONE".equals(booking.getStatus()) && !"INSPECTION_DONE".equals(booking.getStatus()) && !"COMPLETED".equals(booking.getStatus())) {
+        if (!"VALIDATION_DONE".equals(booking.getStatus()) && !"APPROVED".equals(booking.getStatus())
+                && !"INSPECTION_DONE".equals(booking.getStatus()) && !"COMPLETED".equals(booking.getStatus())) {
             throw new RuntimeException("Booking must be validated before sending the report.");
+        }
+
+        Lead lead = leadRepository.findById(booking.getLeadId()).orElse(null);
+        if (lead != null && !"Fully Paid".equalsIgnoreCase(lead.getPaymentStatus())) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Report cannot be sent: Customer payment status is '" + (lead.getPaymentStatus() != null ? lead.getPaymentStatus() : "Pending")
+                + "'. The final report is only dispatched to the customer once full payment has been received."
+            );
         }
 
         booking.setStatus("REPORT_SENT");
         booking.setUpdatedAt(Instant.now());
         Booking saved = bookingRepository.save(booking);
 
-        leadRepository.findById(booking.getLeadId()).ifPresent(lead -> {
+        if (lead != null) {
             lead.setReportStatus("Report Sent");
             leadRepository.save(lead);
 
@@ -561,7 +571,7 @@ public class BookingService {
 
             // Two-Way Sync: notify external Admin Portal that report has been dispatched
             adminPortalSyncService.notifyReportSent(lead, saved, reportUrl);
-        });
+        }
         return saved;
     }
 
