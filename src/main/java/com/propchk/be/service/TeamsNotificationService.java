@@ -444,7 +444,7 @@ public class TeamsNotificationService {
             facts.add(Map.of("title", "Project", "value", project + " (" + booking.getCity() + ")"));
             facts.add(Map.of("title", "Date & Slot", "value", booking.getDate() + " • " + booking.getSlotTime()));
             facts.add(Map.of("title", "Assigned Engineer", "value", engineerName));
-            facts.add(Map.of("title", "Assigned By", "value", assignedBy != null ? assignedBy : "City Head (Teams)"));
+            facts.add(Map.of("title", "Assigned By", "value", assignedBy != null ? assignedBy : "City Lead (Teams)"));
             facts.add(Map.of("title", "Status", "value", "CONFIRMED ✅"));
 
             List<Map<String, Object>> body = new ArrayList<>();
@@ -575,7 +575,7 @@ public class TeamsNotificationService {
             String customer = (lead != null && lead.getCustomerName() != null) ? lead.getCustomerName() : "Customer";
             List<Map<String, String>> facts = new ArrayList<>();
             facts.add(Map.of("title", "Customer", "value", customer));
-            facts.add(Map.of("title", "Validated By", "value", validatedBy != null ? validatedBy : "City Head (Teams)"));
+            facts.add(Map.of("title", "Validated By", "value", validatedBy != null ? validatedBy : "City Lead (Teams)"));
             facts.add(Map.of("title", "New Status", "value", "VALIDATION_DONE 🎉"));
 
             List<Map<String, Object>> body = new ArrayList<>();

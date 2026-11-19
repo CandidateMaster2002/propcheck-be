@@ -61,7 +61,7 @@ public class TeamsActionController {
     public ResponseEntity<Map<String, Object>> assignEngineerFromTeams(@RequestBody Map<String, Object> req) {
         Long bookingId = Long.valueOf(req.get("bookingId").toString());
         String empNum = req.get("engineerEmployeeNumber").toString();
-        String assignedBy = req.getOrDefault("assignedBy", "City Head (Teams)").toString();
+        String assignedBy = req.getOrDefault("assignedBy", "City Lead (Teams)").toString();
 
         AssignEngineerRequest assignReq = new AssignEngineerRequest();
         assignReq.setEngineerEmployeeNumber(empNum);
@@ -180,7 +180,7 @@ public class TeamsActionController {
     @PostMapping("/actions/validate-report")
     public ResponseEntity<Map<String, Object>> validateReportFromTeams(@RequestBody Map<String, Object> req) {
         Long bookingId = Long.valueOf(req.get("bookingId").toString());
-        String validatedBy = req.getOrDefault("validatedBy", "City Head (Teams)").toString();
+        String validatedBy = req.getOrDefault("validatedBy", "City Lead (Teams)").toString();
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
@@ -222,7 +222,7 @@ public class TeamsActionController {
                     leadRepository.save(lead);
                 }
 
-                teamsNotificationService.sendValidationConfirmationNotification(saved, lead, "City Head (1-Click Teams)");
+                teamsNotificationService.sendValidationConfirmationNotification(saved, lead, "City Lead (1-Click Teams)");
 
                 String targetUrl = portalFrontendUrl.replaceAll("/$", "");
                 if (lead != null && lead.getId() != null) {
