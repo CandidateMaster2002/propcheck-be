@@ -55,6 +55,9 @@ public class Lead {
     @jakarta.persistence.Transient
     private String currentAssignedEngineer;
 
+    @jakarta.persistence.Transient
+    private Long currentBookingId;
+
     // Payment fields (sourced from Zoho CRM financial data)
     private String estimateNo;
     private String retainerNo;

@@ -84,6 +84,7 @@ public class LeadController {
                 if (b != null) {
                     l.setCurrentBookingStatus(b.getStatus());
                     l.setCurrentAssignedEngineer(b.getEngineerEmployeeNumber());
+                    l.setCurrentBookingId(b.getId());
                     
                     // Fallback to fill old leads where inspectionDateAndTime wasn't originally set during booking
                     if (l.getInspectionDateAndTime() == null || l.getInspectionDateAndTime().trim().isEmpty()) {
