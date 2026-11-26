@@ -79,14 +79,14 @@ public class ZohoLeadMapper {
         lead.setEmailApproval(stringOrNull(record, "Inspection_Email_Status"));
         lead.setZohoModifiedTime(stringOrNull(record, "Modified_Time"));
 
-        // Payment fields
-        lead.setEstimateNo(stringOrNull(record, "Estimate_No"));
-        lead.setRetainerNo(stringOrNull(record, "Retainer_No"));
-        lead.setRetainerNo2(stringOrNull(record, "Retainer_No_2"));
+        // Payment fields (support both legacy and current Zoho CRM field API names)
+        lead.setEstimateNo(firstNonBlank(record, "Estimate_No", "Invoice_No_1"));
+        lead.setRetainerNo(firstNonBlank(record, "Retainer_No", "Retainer_No_1"));
+        lead.setRetainerNo2(firstNonBlank(record, "Retainer_No_2", "Retainer_No2"));
         lead.setInspectionCost(doubleOrNull(record, "Inspection_Cost"));
         lead.setReInspectionCost(doubleOrNull(record, "Re_Inspection_Cost"));
         lead.setReceivedAmount(doubleOrNull(record, "Received_Amount"));
-        lead.setPendingAmount(doubleOrNull(record, "Pending_Amt"));
+        lead.setPendingAmount(firstNonNullDouble(record, "Pending_Amount", "Pending_Amt"));
         lead.setTotalRevenue(doubleOrNull(record, "Revenue"));
 
         lead.setFullPaymentReceived(stringOrNull(record, "Full_Payment_Received"));
@@ -101,7 +101,8 @@ public class ZohoLeadMapper {
                 lead.getFullPaymentReceived(),
                 lead.getRefundAmount(),
                 lead.getReceivedAmount(),
-                lead.getPendingAmount()
+                lead.getPendingAmount(),
+                lead.getTotalRevenue()
         ));
 
         lead.setSyncedAt(Instant.now());
@@ -162,6 +163,26 @@ public class ZohoLeadMapper {
         try { return Double.parseDouble(val.toString()); } catch (NumberFormatException e) { return null; }
     }
 
+    public String firstNonBlank(Map<String, Object> record, String... keys) {
+        for (String key : keys) {
+            String val = stringOrNull(record, key);
+            if (val != null && !val.trim().isEmpty()) {
+                return val.trim();
+            }
+        }
+        return null;
+    }
+
+    public Double firstNonNullDouble(Map<String, Object> record, String... keys) {
+        for (String key : keys) {
+            Double val = doubleOrNull(record, key);
+            if (val != null) {
+                return val;
+            }
+        }
+        return null;
+    }
+
     public String extractNameFromMap(Object obj) {
         if (obj instanceof Map) {
             Object name = ((Map<?, ?>) obj).get("name");
@@ -172,6 +193,11 @@ public class ZohoLeadMapper {
 
     public String computePaymentStatus(String refundFlag, String fullPaymentReceivedFlag,
                                        Double refund, Double received, Double pending) {
+        return computePaymentStatus(refundFlag, fullPaymentReceivedFlag, refund, received, pending, null);
+    }
+
+    public String computePaymentStatus(String refundFlag, String fullPaymentReceivedFlag,
+                                       Double refund, Double received, Double pending, Double totalRevenue) {
         
         if (refundFlag != null && (refundFlag.trim().equalsIgnoreCase("Yes") || refundFlag.trim().equalsIgnoreCase("true"))) {
             return "Refunded";
@@ -186,6 +212,12 @@ public class ZohoLeadMapper {
         
         if (pending != null && pending <= 100) return "Fully Paid";
         if (received != null && received > 0) return "Partially Paid";
+        if (pending != null && pending > 100) {
+            if (totalRevenue != null && pending < totalRevenue) {
+                return "Partially Paid";
+            }
+            return "Payment Pending";
+        }
         return "Data Not Updated";
     }
 }
