@@ -21,6 +21,23 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
+    public UserSummary createAdminUser(CreateSalesRequest req) {
+        if (userRepository.existsByEmail(req.getEmail())) {
+            throw new DuplicateEmailException("Email already exists");
+        }
+
+        User user = new User();
+        user.setName(req.getName());
+        user.setEmail(req.getEmail());
+        user.setPassword(req.getPassword());
+        user.setRole(Role.ADMIN);
+        user.setCity(null);
+        user.setCanValidate(true);
+
+        user = userRepository.save(user);
+        return mapToSummary(user);
+    }
+
     public UserSummary createSalesUser(CreateSalesRequest req) {
         if (userRepository.existsByEmail(req.getEmail())) {
             throw new DuplicateEmailException("Email already exists");
@@ -90,8 +107,10 @@ public class UserService {
     }
 
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found");
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (user.getRole() == Role.SUPER_ADMIN) {
+            throw new RuntimeException("Cannot delete Super Admin.");
         }
         userRepository.deleteById(id);
     }
@@ -127,7 +146,8 @@ public class UserService {
     }
 
     private UserSummary mapToSummary(User user) {
-        boolean hasValidationPower = user.getRole() == Role.ADMIN
+        boolean hasValidationPower = user.getRole() == Role.SUPER_ADMIN
+                || user.getRole() == Role.ADMIN
                 || user.getRole() == Role.VALIDATOR
                 || Boolean.TRUE.equals(user.getCanValidate());
         return new UserSummary(

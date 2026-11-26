@@ -30,7 +30,8 @@ public class AuthService {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
-        boolean hasValidationPower = user.getRole() == com.propchk.be.entity.Role.ADMIN
+        boolean hasValidationPower = user.getRole() == com.propchk.be.entity.Role.SUPER_ADMIN
+                || user.getRole() == com.propchk.be.entity.Role.ADMIN
                 || user.getRole() == com.propchk.be.entity.Role.VALIDATOR
                 || Boolean.TRUE.equals(user.getCanValidate());
 

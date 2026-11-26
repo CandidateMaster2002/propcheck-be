@@ -20,18 +20,20 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (!userRepository.existsByRole(Role.ADMIN)) {
-            User admin = new User();
-            admin.setName("Admin");
-            admin.setEmail("admin@example.com");
-            admin.setPassword("123");
-            admin.setRole(Role.ADMIN);
-            admin.setCity(null);
-
-            userRepository.save(admin);
-            logger.info("Admin user was seeded into the database.");
+        if (!userRepository.existsByRole(Role.SUPER_ADMIN)) {
+            User superAdmin = userRepository.findByEmail("admin@example.com").orElse(new User());
+            if (superAdmin.getId() == null) {
+                superAdmin.setName("Super Admin");
+                superAdmin.setEmail("admin@example.com");
+                superAdmin.setPassword("123");
+                superAdmin.setCity(null);
+            }
+            superAdmin.setRole(Role.SUPER_ADMIN);
+            superAdmin.setCanValidate(true);
+            userRepository.save(superAdmin);
+            logger.info("Super Admin user ensured in the database (admin@example.com).");
         } else {
-            logger.info("Admin user already exists. Seeding skipped.");
+            logger.info("Super Admin user already exists. Seeding skipped.");
         }
     }
 }

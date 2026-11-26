@@ -21,6 +21,12 @@ public class UserController {
         this.userService = userService;
     }
 
+    @PostMapping("/admin")
+    public ResponseEntity<UserSummary> createAdminUser(@Valid @RequestBody CreateSalesRequest request) {
+        UserSummary summary = userService.createAdminUser(request);
+        return new ResponseEntity<>(summary, HttpStatus.CREATED);
+    }
+
     @PostMapping("/sales")
     public ResponseEntity<UserSummary> createSalesUser(@Valid @RequestBody CreateSalesRequest request) {
         UserSummary summary = userService.createSalesUser(request);
