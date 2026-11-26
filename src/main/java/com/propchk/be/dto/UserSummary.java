@@ -13,4 +13,5 @@ public class UserSummary {
     private String email;
     private String role;
     private String city;
+    private boolean canValidate;
 }

@@ -32,6 +32,7 @@ public class UserService {
         user.setPassword(req.getPassword());
         user.setRole(Role.SALES);
         user.setCity(null);
+        user.setCanValidate(Boolean.TRUE.equals(req.getCanValidate()));
 
         user = userRepository.save(user);
         return mapToSummary(user);
@@ -48,6 +49,7 @@ public class UserService {
         user.setPassword(req.getPassword());
         user.setRole(Role.CITY_HEAD);
         user.setCity(req.getCity());
+        user.setCanValidate(Boolean.TRUE.equals(req.getCanValidate()));
 
         user = userRepository.save(user);
         return mapToSummary(user);
@@ -64,6 +66,7 @@ public class UserService {
         user.setPassword(req.getPassword());
         user.setRole(Role.VALIDATOR);
         user.setCity(null);
+        user.setCanValidate(true);
 
         user = userRepository.save(user);
         return mapToSummary(user);
@@ -116,17 +119,24 @@ public class UserService {
             String hashed = org.mindrot.jbcrypt.BCrypt.hashpw(req.getPassword(), org.mindrot.jbcrypt.BCrypt.gensalt());
             user.setPassword(hashed);
         }
+        if (req.getCanValidate() != null) {
+            user.setCanValidate(req.getCanValidate());
+        }
 
         userRepository.save(user);
     }
 
     private UserSummary mapToSummary(User user) {
+        boolean hasValidationPower = user.getRole() == Role.ADMIN
+                || user.getRole() == Role.VALIDATOR
+                || Boolean.TRUE.equals(user.getCanValidate());
         return new UserSummary(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getRole().name(),
-                user.getCity()
+                user.getCity(),
+                hasValidationPower
         );
     }
 }

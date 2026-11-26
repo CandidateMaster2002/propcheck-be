@@ -18,4 +18,6 @@ public class CreateCityHeadRequest {
 
     @NotBlank
     private String city;
+
+    private Boolean canValidate;
 }

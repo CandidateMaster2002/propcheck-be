@@ -6,6 +6,7 @@ public class UpdateUserRequest {
     private String email;
     private String city;
     private String password;
+    private Boolean canValidate;
 
     public String getName() {
         return name;
@@ -37,5 +38,13 @@ public class UpdateUserRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Boolean getCanValidate() {
+        return canValidate;
+    }
+
+    public void setCanValidate(Boolean canValidate) {
+        this.canValidate = canValidate;
     }
 }

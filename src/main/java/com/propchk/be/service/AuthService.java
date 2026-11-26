@@ -30,12 +30,17 @@ public class AuthService {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
+        boolean hasValidationPower = user.getRole() == com.propchk.be.entity.Role.ADMIN
+                || user.getRole() == com.propchk.be.entity.Role.VALIDATOR
+                || Boolean.TRUE.equals(user.getCanValidate());
+
         return new LoginResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getRole().name(),
-                user.getCity()
+                user.getCity(),
+                hasValidationPower
         );
     }
     public void changePassword(String email, String oldPassword, String newPassword) {

@@ -31,4 +31,7 @@ public class User {
 
     @Column(nullable = true)
     private String city;
+
+    @Column(nullable = true)
+    private Boolean canValidate = false;
 }
