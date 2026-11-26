@@ -24,17 +24,20 @@ public class BookingController {
     private final EngineerRepository engineerRepository;
     private final com.propchk.be.service.TeamsNotificationService teamsNotificationService;
     private final com.propchk.be.repository.LeadRepository leadRepository;
+    private final com.propchk.be.service.AdminPortalSyncService adminPortalSyncService;
 
     public BookingController(BookingService bookingService,
                              BookingRepository bookingRepository,
                              EngineerRepository engineerRepository,
                              com.propchk.be.service.TeamsNotificationService teamsNotificationService,
-                             com.propchk.be.repository.LeadRepository leadRepository) {
+                             com.propchk.be.repository.LeadRepository leadRepository,
+                             com.propchk.be.service.AdminPortalSyncService adminPortalSyncService) {
         this.bookingService = bookingService;
         this.bookingRepository = bookingRepository;
         this.engineerRepository = engineerRepository;
         this.teamsNotificationService = teamsNotificationService;
         this.leadRepository = leadRepository;
+        this.adminPortalSyncService = adminPortalSyncService;
     }
 
     /**
@@ -257,6 +260,41 @@ public class BookingController {
     @PostMapping("/{id}/approve")
     public ResponseEntity<Booking> approveReport(@PathVariable Long id) {
         return ResponseEntity.ok(bookingService.approveReport(id));
+    }
+
+    /** Fetch full B2C Property inspection report (snags, photos, scores, spaces) by booking ID */
+    @GetMapping("/{id}/b2c-report")
+    public ResponseEntity<Map<String, Object>> getB2cReportByBooking(@PathVariable Long id) {
+        Booking booking = bookingRepository.findById(id).orElse(null);
+        Lead lead = null;
+        Long leadId = null;
+        Long bookingId = null;
+        if (booking != null) {
+            bookingId = booking.getId();
+            leadId = booking.getLeadId();
+            if (leadId != null) {
+                lead = leadRepository.findById(leadId).orElse(null);
+            }
+        } else {
+            lead = leadRepository.findById(id).orElse(null);
+            if (lead != null) {
+                leadId = lead.getId();
+            }
+        }
+        String phone = lead != null ? lead.getPhone() : null;
+        String email = lead != null ? lead.getEmail() : null;
+        return ResponseEntity.ok(adminPortalSyncService.fetchB2cPropertyReport(leadId, bookingId, phone, email));
+    }
+
+    /** Fetch full B2C Property inspection report by lead ID */
+    @GetMapping("/for-lead/{leadId}/b2c-report")
+    public ResponseEntity<Map<String, Object>> getB2cReportByLead(@PathVariable Long leadId) {
+        Lead lead = leadRepository.findById(leadId).orElse(null);
+        List<Booking> bookings = bookingRepository.findByLeadId(leadId);
+        Long bookingId = bookings.isEmpty() ? null : bookings.get(bookings.size() - 1).getId();
+        String phone = lead != null ? lead.getPhone() : null;
+        String email = lead != null ? lead.getEmail() : null;
+        return ResponseEntity.ok(adminPortalSyncService.fetchB2cPropertyReport(leadId, bookingId, phone, email));
     }
 
     /** VALIDATOR: Reject a completed inspection report with remarks */

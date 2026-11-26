@@ -9,9 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -31,6 +33,12 @@ public class AdminPortalSyncService {
 
     @Value("${admin.portal.webhook.url:}")
     private String adminPortalWebhookUrl;
+
+    @Value("${b2c.portal.url:https://propcheck-b2c-admin.vercel.app}")
+    private String b2cPortalUrl;
+
+    @Value("${b2c.portal.sync.secret:propcheck_internal_sync_2026}")
+    private String b2cSyncSecret;
 
     public AdminPortalSyncService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -192,5 +200,50 @@ public class AdminPortalSyncService {
                 log.warn("Could not reach Admin Portal webhook at {}: {}", adminPortalWebhookUrl, e.getMessage());
             }
         });
+    }
+
+    /**
+     * Fetch full B2C Property inspection report (including inspectionDetail, photos, scores)
+     * from the B2C NextJS portal.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> fetchB2cPropertyReport(Long leadId, Long bookingId, String phone, String email) {
+        String baseUrl = (b2cPortalUrl != null && !b2cPortalUrl.trim().isEmpty())
+                ? b2cPortalUrl.trim().replaceAll("/+$", "")
+                : "https://propcheck-b2c-admin.vercel.app";
+
+        StringBuilder qs = new StringBuilder();
+        appendParam(qs, "leadId", leadId != null ? leadId.toString() : null);
+        appendParam(qs, "bookingId", bookingId != null ? bookingId.toString() : null);
+        appendParam(qs, "phone", phone);
+        appendParam(qs, "email", email);
+
+        String url = baseUrl + "/api/propcheck/property" + (qs.length() > 0 ? "?" + qs : "");
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("x-propcheck-secret", b2cSyncSecret)
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                return objectMapper.readValue(response.body(), Map.class);
+            }
+            log.warn("B2C property fetch returned HTTP {}: {}", response.statusCode(), response.body());
+            return Map.of("status", false, "message", "B2C inspection data not found (HTTP " + response.statusCode() + ")");
+        } catch (Exception e) {
+            log.warn("Failed to fetch B2C property report from {}: {}", url, e.getMessage());
+            return Map.of("status", false, "message", "Unable to reach B2C portal: " + e.getMessage());
+        }
+    }
+
+    private void appendParam(StringBuilder qs, String key, String value) {
+        if (value == null || value.trim().isEmpty()) return;
+        if (qs.length() > 0) qs.append('&');
+        qs.append(URLEncoder.encode(key, StandardCharsets.UTF_8))
+          .append('=')
+          .append(URLEncoder.encode(value.trim(), StandardCharsets.UTF_8));
     }
 }
