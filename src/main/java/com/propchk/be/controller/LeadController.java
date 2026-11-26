@@ -57,66 +57,70 @@ public class LeadController {
         
         List<Lead> leads = leadRepository.searchLeads(finalCity, finalSearch, finalFilter, finalOwner);
 
-        // Fetch active bookings for these leads to populate UI status dynamically
-        if (!leads.isEmpty()) {
-            java.util.List<Long> leadIds = leads.stream().map(Lead::getId).collect(java.util.stream.Collectors.toList());
-            java.util.List<com.propchk.be.entity.Booking> activeBookings = bookingRepository.findActiveBookingsByLeadIds(leadIds);
-            
-            java.util.Map<Long, com.propchk.be.entity.Booking> bookingMap = new java.util.HashMap<>();
-            for (com.propchk.be.entity.Booking b : activeBookings) {
-                // If a lead has multiple active bookings somehow, we prefer CONFIRMED
-                if (!bookingMap.containsKey(b.getLeadId()) || "CONFIRMED".equals(b.getStatus())) {
-                    bookingMap.put(b.getLeadId(), b);
-                }
-            }
+        enrichLeadsWithBookingStatus(leads);
+        return ResponseEntity.ok(leads);
+    }
 
-            // Also fetch inactive ones so we can correctly label them as Postponed/Cancelled instead of Unbooked
-            java.util.List<com.propchk.be.entity.Booking> inactiveBookings = bookingRepository.findCancelledOrPostponedBookingsByLeadIds(leadIds);
-            java.util.Map<Long, com.propchk.be.entity.Booking> inactiveMap = new java.util.HashMap<>();
-            for (com.propchk.be.entity.Booking b : inactiveBookings) {
-                if (!inactiveMap.containsKey(b.getLeadId())) {
-                    inactiveMap.put(b.getLeadId(), b);
-                }
-            }
+    private void enrichLeadsWithBookingStatus(List<Lead> leads) {
+        if (leads == null || leads.isEmpty()) return;
 
-            for (Lead l : leads) {
-                com.propchk.be.entity.Booking b = bookingMap.get(l.getId());
-                if (b != null) {
-                    l.setCurrentBookingStatus(b.getStatus());
-                    l.setCurrentAssignedEngineer(b.getEngineerEmployeeNumber());
-                    l.setCurrentBookingId(b.getId());
-                    
-                    // Fallback to fill old leads where inspectionDateAndTime wasn't originally set during booking
-                    if (l.getInspectionDateAndTime() == null || l.getInspectionDateAndTime().trim().isEmpty()) {
-                        l.setInspectionDateAndTime(b.getDate() + " " + b.getSlotTime());
-                    }
-                } else {
-                    com.propchk.be.entity.Booking inb = inactiveMap.get(l.getId());
-                    if (inb != null && "POSTPONED".equals(inb.getStatus())) {
-                        l.setCurrentBookingStatus("POSTPONED");
-                    } else if (inb != null) {
-                        l.setCurrentBookingStatus("CANCELLED");
-                    } else {
-                        l.setCurrentBookingStatus("NOT_SCHEDULED");
-                    }
-                }
+        java.util.List<Long> leadIds = leads.stream().map(Lead::getId).collect(java.util.stream.Collectors.toList());
+        java.util.List<com.propchk.be.entity.Booking> activeBookings = bookingRepository.findActiveBookingsByLeadIds(leadIds);
+
+        java.util.Map<Long, com.propchk.be.entity.Booking> bookingMap = new java.util.HashMap<>();
+        for (com.propchk.be.entity.Booking b : activeBookings) {
+            if (!bookingMap.containsKey(b.getLeadId()) || "CONFIRMED".equals(b.getStatus())) {
+                bookingMap.put(b.getLeadId(), b);
             }
         }
 
-        return ResponseEntity.ok(leads);
+        java.util.List<com.propchk.be.entity.Booking> inactiveBookings = bookingRepository.findCancelledOrPostponedBookingsByLeadIds(leadIds);
+        java.util.Map<Long, com.propchk.be.entity.Booking> inactiveMap = new java.util.HashMap<>();
+        for (com.propchk.be.entity.Booking b : inactiveBookings) {
+            if (!inactiveMap.containsKey(b.getLeadId())) {
+                inactiveMap.put(b.getLeadId(), b);
+            }
+        }
+
+        for (Lead l : leads) {
+            com.propchk.be.entity.Booking b = bookingMap.get(l.getId());
+            if (b != null) {
+                l.setCurrentBookingStatus(b.getStatus());
+                l.setCurrentAssignedEngineer(b.getEngineerEmployeeNumber());
+                l.setCurrentBookingId(b.getId());
+                if (l.getInspectionDateAndTime() == null || l.getInspectionDateAndTime().trim().isEmpty()) {
+                    l.setInspectionDateAndTime(b.getDate() + " " + b.getSlotTime());
+                }
+            } else {
+                com.propchk.be.entity.Booking inb = inactiveMap.get(l.getId());
+                if (inb != null && "POSTPONED".equals(inb.getStatus())) {
+                    l.setCurrentBookingStatus("POSTPONED");
+                } else if (inb != null) {
+                    l.setCurrentBookingStatus("CANCELLED");
+                } else {
+                    l.setCurrentBookingStatus("NOT_SCHEDULED");
+                }
+            }
+        }
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Lead> getLeadById(@PathVariable Long id) {
         return leadRepository.findById(id)
-                .map(ResponseEntity::ok)
+                .map(lead -> {
+                    enrichLeadsWithBookingStatus(List.of(lead));
+                    return ResponseEntity.ok(lead);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/me")
     public ResponseEntity<Lead> getMyLeadData(@RequestParam String email) {
         return leadRepository.findByEmail(email)
-                .map(ResponseEntity::ok)
+                .map(lead -> {
+                    enrichLeadsWithBookingStatus(List.of(lead));
+                    return ResponseEntity.ok(lead);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
